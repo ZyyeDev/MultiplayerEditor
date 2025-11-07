@@ -1,0 +1,14 @@
+{
+	"geode": "4.9.0",
+	"gd": {
+		"win": "2.2074",
+		"android": "2.2074",
+		"mac": "2.2074",
+		"ios": "2.2074"
+	},
+	"id": "test.multiplayereditor",
+	"name": "MultiplayerEditor",
+	"version": "v0.0.1 alpha",
+	"developer": "",
+	"description": ""
+}
