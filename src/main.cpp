@@ -2,6 +2,7 @@
 #include <Geode/loader/Log.hpp>
 #include <Geode/modify/EditorUI.hpp>
 #include <Geode/modify/MenuLayer.hpp>
+#include <Geode/modify/CCScheduler.hpp>
 
 #include "network/NetworkManager.hpp"
 #include "sync/SyncManager.hpp"
@@ -37,10 +38,13 @@ $on_mod(Loaded){
 	log::info("Collab editor loaded!");
 }
 
-$execute {
-	Loader::get()->queueInMainThread([] {
-		if (g_network){
-			g_network->poll();
-		}
-	});
-}
+// Poll in every frame
+class $modify(CCScheduler) {
+    void update(float dt) {
+        CCScheduler::update(dt);
+        
+        if (g_network) {
+            g_network->poll();
+        }
+    }
+};
