@@ -1,9 +1,11 @@
 #include <Geode/Geode.hpp>
 
+#include "../sync/SyncManager.hpp"
 #include "JoinPopup.hpp"
 #include "../network/NetworkManager.hpp"
 
 extern NetworkManager* g_network;
+extern SyncManager* g_sync;
 
 extern bool g_isHost;
 extern bool g_isInSession;
@@ -74,20 +76,20 @@ void JoinPopup::OnJoin(CCObject*){
         g_isHost = false;
         g_isInSession = true;
 
+        g_sync->setUserID("client");
+
         this->onClose(nullptr);
 
         // go to editor
-        auto editorLayer = LevelEditorLayer::get();
-        if (!editorLayer){
-            auto level = GJGameLevel::create();
-            level->m_levelName = "Collab Session";
+        auto level = GJGameLevel::create();
+        level->m_levelName = "Collab Session";
 
-            auto scene = CCScene::create();
-            auto editorLayer = LevelEditorLayer::create(level, false);
-            scene->addChild(editorLayer);
+        auto scene = CCScene::create();
+        auto editorLayer = LevelEditorLayer::create(level, false);
+        scene->addChild(editorLayer);
 
-            CCDirector::sharedDirector()->replaceScene(CCTransitionScene::create(0.5f,scene));
-        }
+        CCDirector::sharedDirector()->replaceScene(CCTransitionFade::create(0.5f,scene));
+        
     } else {
         FLAlertLayer::create("Connection Failed", "Couldn't connect to host!", "OK")->show();
     }

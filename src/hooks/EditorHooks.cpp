@@ -15,7 +15,7 @@ class $modify(LevelEditorLayer){
     void addSpecial(GameObject* p0) {
         LevelEditorLayer::addSpecial(p0);
 
-        if (g_isInSession && g_sync){
+        if (g_isInSession && g_sync && !g_sync->isApplyingRemoteChanges()){
             g_sync->onLocalObjectAdded(p0);
         }
     }

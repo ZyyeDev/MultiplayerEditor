@@ -35,6 +35,8 @@ class SyncManager{
         int m_objectCounter;
         std::string m_userID;
 
+        bool m_applyingRemoteChanges = false;
+
         /* -- selection -- */
         CCPoint m_CursorPos;
         CCArray* m_Selection;
@@ -74,6 +76,10 @@ class SyncManager{
 
         CCPoint getCursorPosition() const { return m_CursorPos; }
         CCArray* getSelection() const { return m_Selection; }
+
+        void setUserID(const std::string id) { m_userID = id; }
+
+        bool isApplyingRemoteChanges() const { return m_applyingRemoteChanges; }
 
         LevelEditorLayer* getEditorLayer();
 

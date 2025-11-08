@@ -193,9 +193,12 @@ void SyncManager::applyObjectData(GameObject* obj, const ObjectData& data) {
 
 GameObject* SyncManager::createObjectFromData(const ObjectData& data){
     auto obj = GameObject::createWithKey(data.objectID);
-    if (obj){
-        applyObjectData(obj, data);
+    if (!obj) {
+        log::error("GameObject::createWithKey failed for ID {}", data.objectID);
+        return nullptr;
     }
+    
+    applyObjectData(obj, data);
     return obj;
 }
 
@@ -242,14 +245,33 @@ void SyncManager::onLocalObjectModified(GameObject* obj) {
 
 void SyncManager::onRemoteObjectAdded(const ObjectAddPacket& packet) {
     auto editor = getEditorLayer();
-    if (!editor) return;
+    if (!editor) {
+        log::error("No editor layer!");
+        return;
+    }
     
     GameObject* obj = createObjectFromData(packet.object);
-    if (obj) {
-        editor->addSpecial(obj);
-        trackObject(packet.object.uid, obj);
-        log::info("Added remote object: {}", packet.object.uid);
+    if (!obj) {
+        log::error("Failed to create object from data!");
+        return;
     }
+    
+    m_applyingRemoteChanges = true;
+    
+    editor->m_objects->addObject(obj);
+    
+    auto objectLayer = editor->m_objectLayer;
+    if (objectLayer) {
+        objectLayer->addChild(obj);
+        obj->setPosition(ccp(packet.object.x, packet.object.y));
+    } else {
+        log::error("No object layer found!");
+    }
+    
+    m_applyingRemoteChanges = false;
+    
+    trackObject(packet.object.uid, obj);
+    log::info("Added remote object: {}", packet.object.uid);
 }
 
 void SyncManager::onRemoteObjectDestroyed(const ObjectDeletePacket& packet) {
