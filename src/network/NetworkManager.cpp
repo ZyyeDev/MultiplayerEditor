@@ -93,10 +93,19 @@ void NetworkManager::sendPacket(const void* data, size_t size){
     if (!m_peer && !m_isHost) return;
 
     ENetPacket* packet = enet_packet_create(data, size, ENET_PACKET_FLAG_RELIABLE);
+    if (!packet) return;
 
     if (m_isHost && m_host->connectedPeers > 0){
+        // dont send packets if no peers connected
+        if (m_host->connectedPeers == 0){
+            enet_packet_destroy(packet);
+            return;
+        }
         enet_host_broadcast(m_host, 0, packet);
     } else {
+        if (!m_peer){
+            return;
+        }
         enet_peer_send(m_peer, 0, packet);
     }
 }
