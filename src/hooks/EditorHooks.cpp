@@ -16,7 +16,25 @@ class $modify(LevelEditorLayer){
         LevelEditorLayer::addSpecial(p0);
 
         if (g_isInSession && g_sync && !g_sync->isApplyingRemoteChanges()){
-            g_sync->onLocalObjectAdded(p0);
+            // HACK: Objects in custom objects tab are detected as objects and are being sent
+            // even tho they are part of the ui. We dont want to send these!!
+            auto editorUI = this->m_editorUI;
+            if (editorUI) {
+                CCNode* parent = p0->getParent();
+                bool isUIElement = false;
+                
+                while (parent) {
+                    if (parent == editorUI) {
+                        isUIElement = true;
+                        break;
+                    }
+                    parent = parent->getParent();
+                }
+                
+                if (!isUIElement) {
+                    g_sync->onLocalObjectAdded(p0);
+                }
+            }
         }
     }
 };
