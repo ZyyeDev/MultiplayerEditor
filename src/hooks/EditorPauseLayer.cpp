@@ -25,17 +25,17 @@ class $modify(CollabEditorPauseLayer, EditorPauseLayer){
             return true;
         }
 
-        if (g_isInSession){
+        if (g_isInSession && !g_isHost){
             auto saveBtn = typeinfo_cast<CCMenuItemSpriteExtra*>(menu->getChildByID("save-button"));
-            if (saveBtn){
-                saveBtn->setEnabled(false);
-                saveBtn->setOpacity(100);
-            }
+            //if (saveBtn){
+            //    saveBtn->setEnabled(false);
+            //    saveBtn->setOpacity(100);
+            //}
 
             auto saveAndExitBtn = typeinfo_cast<CCMenuItemSpriteExtra*>(menu->getChildByID("save-and-exit-button"));
             if (saveAndExitBtn) {
                 saveAndExitBtn->setEnabled(false);
-                saveAndExitBtn->setOpacity(100);
+                saveAndExitBtn->setVisible(false);
             }
         }
 
