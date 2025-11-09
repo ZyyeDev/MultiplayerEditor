@@ -46,7 +46,6 @@ class SyncManager{
         void highlightRemoteSelection();
     public:
         SyncManager();
-        ~SyncManager();
 
         /* --- LOCAL EVENTS --- */
         // object stuff

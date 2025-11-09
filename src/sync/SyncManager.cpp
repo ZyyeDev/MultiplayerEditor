@@ -19,8 +19,6 @@ SyncManager::SyncManager() : m_objectCounter(0), m_lastUpdateTimestamp(0) {
     });
 }
 
-//SyncManager::~SyncManager();
-
 std::string SyncManager::generateUID() {
     return m_userID + "_" + std::to_string(m_objectCounter++);
 }
