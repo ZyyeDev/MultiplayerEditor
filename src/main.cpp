@@ -59,7 +59,7 @@ class $modify(CCScheduler) {
                 CCPoint worldPos = editorLayer->m_objectLayer->convertToNodeSpace(mousePos);
                 
                 float distance = ccpDistance(lastMousePos,worldPos);
-                if (distance > 2.0f){
+                if (distance > 0.5f){
                     g_sync->onLocalCursorUpdate(worldPos);
                     lastMousePos = worldPos;
                 }
