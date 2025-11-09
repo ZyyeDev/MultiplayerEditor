@@ -37,12 +37,16 @@ class SyncManager{
 
         bool m_applyingRemoteChanges = false;
 
-        /* -- selection -- */
+        /* -- SELECTION -- */
         std::map<std::string, std::vector<CCSprite*>> m_remoteSelectionHighlights;
         std::map<std::string, std::vector<std::string>> m_remoteSelections;
         std::map<std::string, CCSprite*> m_remoteCursors;
         CCPoint m_CursorPos;
         CCArray* m_Selection;
+
+        /* -- LEVEL SETTINGS -- */
+        LevelSettingsData extractLevelSettings();
+        void applyLevelSettings(const LevelSettingsData& settings);
     public:
         SyncManager();
 
@@ -56,6 +60,9 @@ class SyncManager{
         void onLocalCursorUpdate(CCPoint position);
         void onLocalSelectionChanged(CCArray* selectedObjects);
 
+        // level settings
+        void onLocalLevelSettingsChanged();
+
         /* --- REMOTE EVENTS --- */
         // object stuff
         void onRemoteObjectAdded(const ObjectAddPacket& packet);
@@ -65,6 +72,9 @@ class SyncManager{
         // selection stuff
         void onRemoteCursorUpdate(const std::string& userID, int x, int y);
         void onRemoteSelectionChanged(const std::string& userID);
+
+        // level settings
+        void onRemoteLevelSettingsChanged(const LevelSettingsPacket& packet);
 
         /* --- FULL SYNC --- */
         void sendFullState();

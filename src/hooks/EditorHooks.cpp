@@ -16,6 +16,12 @@ void objectModified(GameObject* object){
     }
 }
 
+void settingsUpdate(){
+    if (g_isInSession && g_sync && !g_sync->isApplyingRemoteChanges()){
+        g_sync->onLocalLevelSettingsChanged();
+    }
+}
+
 class $modify(LevelEditorLayer){
     /* -- add obj -- */
     void addSpecial(GameObject* p0) {
@@ -100,7 +106,7 @@ class $modify(EditorUI){
         EditorUI::ccTouchMoved(touch, event);
 
         if (g_isInSession && g_sync){
-            CCPoint screenPos = touch->getLocation();
+            CCPoint glPos = touch->getLocation();
 
             auto editorLayer = LevelEditorLayer::get();
             if (!editorLayer) return;
@@ -108,9 +114,34 @@ class $modify(EditorUI){
             auto objLayer = editorLayer->m_objectLayer;
             if (!objLayer) return;
 
-            CCPoint worldPos = objLayer->convertToNodeSpace(screenPos);
+            CCPoint worldPos = objLayer->convertToNodeSpace(glPos);
 
             g_sync->onLocalCursorUpdate(worldPos);
         }
+    }
+
+    // possible settings modified
+    void selectBuildTab(int p0) {
+        EditorUI::selectBuildTab(p0);
+
+        if (p0 == 4){
+            log::info("change to tab {}",p0);
+            settingsUpdate();
+        }
+    }
+
+    void updateSlider() {
+        EditorUI::updateSlider();
+        settingsUpdate();
+    }
+
+    void toggleMode(CCObject* p0) {
+        EditorUI::toggleMode(p0);
+        settingsUpdate();
+    }
+
+    void songStateChanged() {
+        EditorUI::songStateChanged();
+        settingsUpdate();
     }
 };

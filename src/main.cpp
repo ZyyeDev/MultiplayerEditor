@@ -53,12 +53,16 @@ class $modify(CCScheduler) {
             auto editorLayer = LevelEditorLayer::get();
             if (editorLayer && editorLayer->m_objectLayer){
                 auto director = CCDirector::sharedDirector();
-                auto mousePos = director->getOpenGLView()->getMousePosition();
-
-                // convert screen coords to world coords
-                CCPoint worldPos = editorLayer->m_objectLayer->convertToNodeSpace(mousePos);
+                auto glView = director->getOpenGLView();
+                if (!glView) return;
                 
-                float distance = ccpDistance(lastMousePos,worldPos);
+                CCPoint screenPos = glView->getMousePosition();
+                
+                // convert screen coords to world coords
+                CCPoint glPos = director->convertToGL(screenPos);
+                CCPoint worldPos = editorLayer->m_objectLayer->convertToNodeSpace(glPos);
+                
+                float distance = ccpDistance(lastMousePos, worldPos);
                 if (distance > 0.5f){
                     g_sync->onLocalCursorUpdate(worldPos);
                     lastMousePos = worldPos;

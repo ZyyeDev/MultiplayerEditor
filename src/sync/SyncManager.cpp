@@ -392,6 +392,10 @@ void SyncManager::handlePacket(const uint8_t* data, size_t size) {
             
             break;
         }
+        case PacketType::LEVEL_SETTINGS: {
+            const LevelSettingsPacket* packet = reinterpret_cast<const LevelSettingsPacket*>(data);
+            onRemoteLevelSettingsChanged(*packet);
+        }
         default:
             log::warn("Unknown packet type: {}", (int)header->type);
             break;
@@ -418,7 +422,6 @@ void SyncManager::onLocalCursorUpdate(CCPoint position){
     
     g_network->sendPacket(&packet, sizeof(packet));
 }
-
 void SyncManager::onRemoteCursorUpdate(const std::string& userID, int x, int y){
     auto it = m_remoteCursors.find(userID);
 
@@ -434,11 +437,24 @@ void SyncManager::onRemoteCursorUpdate(const std::string& userID, int x, int y){
         }
 
         auto cursor = CCSprite::create("cursor.png"_spr);
+        if (!cursor) {
+            log::error("failed to create cursor sprite!");
+            return;
+        }
+        
         editor->m_objectLayer->addChild(cursor, 9999);
         cursor->setPosition(position);
+        
+        // this should show they gd name, not userID
+        auto label = CCLabelBMFont::create(userID.c_str(), "chatFont.fnt");
+        label->setScale(0.5f);
+        label->setPosition(ccp(cursor->getContentSize().width / 2, cursor->getContentSize().height + 10));
+        cursor->addChild(label);
 
         m_remoteCursors[userID] = cursor;
-    }else{
+        
+        log::info("created cursor for user: {}", userID);
+    } else {
         it->second->setPosition(position);
     }
 }
@@ -547,4 +563,145 @@ void SyncManager::onRemoteSelectionChanged(const std::string& userID){
         editor->m_objectLayer->addChild(highlight);
         highlights.push_back(highlight);
     }
+}
+
+LevelSettingsData SyncManager::extractLevelSettings(){
+    LevelSettingsData data;
+    memset(&data, 0, sizeof(data));
+
+    auto editor = getEditorLayer();
+    if (!editor) {
+        log::error("cant get editor layer!!");
+        return data;
+    }
+
+    auto level = editor->m_level;
+    if (!level) {
+        log::error("level is null!");
+        return data;
+    }
+
+    // audio settings
+    data.songID = level->m_audioTrack;
+    data.customSongID = level->m_songID;
+
+    auto settings = editor->m_levelSettings;
+    if (!settings) {
+        log::error("m_levelSettings is null!!");
+        return data;
+    }
+    
+    // color settings - using pointer access
+    data.backgroundColorID = settings->m_backgroundIndex;
+    data.groundColorID = settings->m_groundIndex;
+    //data.lineColorID = settings->m_lineIndex;
+    //data.objectColorID = settings->m_objectIndex;
+    //data.color1ID = settings->m_color1Index;
+    //data.color2ID = settings->m_color2Index;
+    //data.color3ID = settings->m_color3Index;
+    //data.color4ID = settings->m_color4Index;
+    
+    data.backgroundIndex = settings->m_backgroundIndex;
+    data.groundIndex = settings->m_groundIndex;
+    data.fontIndex = settings->m_fontIndex;
+
+    // gameplay settings
+    data.isPlatformer = level->isPlatformer();
+    data.gamemode = settings->m_startMode;
+    //data.miniMode = settings->m_isMini;
+    //data.dualMode = settings->m_isDualMode;
+    data.twoPlayerMode = level->m_twoPlayerMode;
+    data.speed = settings->m_startSpeed;
+
+    // guideline
+    //data.guidelineSpacing = settings->m_guidelineSpacing;
+
+    return data;
+}
+
+void SyncManager::applyLevelSettings(const LevelSettingsData& data) {
+    auto editor = getEditorLayer();
+    if (!editor) {
+        log::error("cant get editor layer");
+        return;
+    }
+
+    auto level = editor->m_level;
+    if (!level) {
+        log::error("level is null!!");
+        return;
+    }
+
+    m_applyingRemoteChanges = true;
+
+    level->m_audioTrack = data.songID;
+    level->m_songID = data.customSongID;
+
+    auto settings = editor->m_levelSettings;
+    if (!settings) {
+        log::error("m_levelSettings is null!");
+        m_applyingRemoteChanges = false;
+        return;
+    }
+    
+    // color settings
+    settings->m_backgroundIndex = data.backgroundColorID;
+    settings->m_groundIndex = data.groundColorID;
+    //settings->m_lineIndex = data.lineColorID;
+    //settings->m_objectIndex = data.objectColorID;
+    //settings->m_color1Index = data.color1ID;
+    //settings->m_color2Index = data.color2ID;
+    //settings->m_color3Index = data.color3ID;
+    //settings->m_color4Index = data.color4ID;
+    
+    settings->m_backgroundIndex = data.backgroundIndex;
+    settings->m_groundIndex = data.groundIndex;
+    settings->m_fontIndex = data.fontIndex;
+
+    // gameplay
+    level->m_twoPlayerMode = data.twoPlayerMode;
+    settings->m_startMode = data.gamemode;
+    //settings->m_isMini = data.miniMode;
+    //settings->m_isDualMode = data.dualMode;
+    settings->m_startSpeed = data.speed;
+
+    // guideline
+    //settings->m_guidelineSpacing = data.guidelineSpacing;
+    
+    if (editor->m_editorUI){
+        editor->m_editorUI->updateButtons();
+    }
+    
+    if (level->m_songID != 0) {
+        // custom song
+        auto songInfo = MusicDownloadManager::sharedState()->getSongInfoObject(level->m_songID);
+        if (songInfo) {
+            FMODAudioEngine::sharedEngine()->playMusic(songInfo->m_songUrl, true, 1.0f, 1);
+        }
+    } else {
+        // official song
+        FMODAudioEngine::sharedEngine()->playMusic(
+            fmt::format("song{}.mp3", level->m_audioTrack), 
+            true, 
+            1.0f, 
+            1
+        );
+    }
+    
+    m_applyingRemoteChanges = false;
+}
+
+void SyncManager::onRemoteLevelSettingsChanged(const LevelSettingsPacket& packet) {
+    applyLevelSettings(packet.settings);
+}
+
+void SyncManager::onLocalLevelSettingsChanged() {
+    LevelSettingsPacket packet;
+    packet.header.type = PacketType::LEVEL_SETTINGS;
+    packet.header.timestamp = getCurrentTimestamp();
+    packet.header.senderID = g_network->getPeerID();
+    packet.settings = extractLevelSettings();
+    
+    g_network->sendPacket(&packet, sizeof(packet));
+    log::info("sent level settings to remote!");
 }

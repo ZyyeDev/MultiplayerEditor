@@ -15,6 +15,7 @@ enum class PacketType : uint8_t {
     OBJECT_UPDATE = 4,
     MOUSE_MOVE = 5,
     SELECT_CHANGE = 6,
+    LEVEL_SETTINGS = 7,
 };
 
 #pragma pack(push, 1)
@@ -442,6 +443,43 @@ struct MousePacket{
     PacketHeader header;
     int x;
     int y;
+};
+
+struct LevelSettingsData{
+    // Audio
+    int songID;
+    int customSongID;
+    
+    // Colors
+    int backgroundColorID;
+    int groundColorID;
+    int lineColorID;
+    int objectColorID;
+    int color1ID;
+    int color2ID;
+    int color3ID;
+    int color4ID;
+    
+    // Gameplay
+    int gamemode;
+    int miniMode;
+    Speed speed;
+    int dualMode;
+    int twoPlayerMode;
+    bool isPlatformer;
+    
+    // Background/Ground
+    int backgroundIndex;
+    int groundIndex;
+    int fontIndex;
+    
+    // Guidelines
+    float guidelineSpacing;
+};
+
+struct LevelSettingsPacket{
+    PacketHeader header;
+    LevelSettingsData settings;
 };
 
 struct SelectPacket{
