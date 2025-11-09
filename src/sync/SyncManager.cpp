@@ -350,6 +350,30 @@ void SyncManager::handlePacket(const uint8_t* data, size_t size) {
             onRemoteCursorUpdate(packet->header.senderID, packet->x, packet->y);
             break;
         }
+        case PacketType::SELECT_CHANGE: {
+            const SelectPacket* packet = reinterpret_cast<const SelectPacket*>(data);
+            
+            std::vector<std::string> uids;
+            for (uint32_t i = 0; i < packet->countInChunk; i++) {
+                uids.push_back(std::string(packet->uids[i]));
+            }
+            
+            // if this is the first chunk, clear previous selection
+            if (packet->chunkIndex == 0) {
+                m_remoteSelections[packet->header.senderID].clear();
+            }
+            
+            for (const auto& uid : uids) {
+                m_remoteSelections[packet->header.senderID].push_back(uid);
+            }
+            
+            // update highlights if no more packets coming
+            if (!packet->hasMore) {
+                onRemoteSelectionChanged(packet->header.senderID);
+            }
+            
+            break;
+        }
         default:
             log::warn("Unknown packet type: {}", (int)header->type);
             break;
@@ -398,5 +422,111 @@ void SyncManager::onRemoteCursorUpdate(const std::string& userID, int x, int y){
         m_remoteCursors[userID] = cursor;
     }else{
         it->second->setPosition(position);
+    }
+}
+
+void SyncManager::onLocalSelectionChanged(CCArray* selectedObjects){
+    if (!selectedObjects){
+        log::error("selected objects is null!!");
+        return;
+    }
+
+    std::vector<std::string> uids;
+    for (auto obj : CCArrayExt<GameObject*>(selectedObjects)){
+        if (isTrackedObject(obj)){
+            uids.push_back(getObjectUid(obj));
+        }
+    }
+    
+    uint32_t totalCount = uids.size();
+    uint32_t chunkIndex = 0;
+
+    for (size_t i = 0; i < uids.size(); i += 50){
+        SelectPacket packet;
+        packet.header.type = PacketType::SELECT_CHANGE;
+        packet.header.timestamp = getCurrentTimestamp();
+        packet.header.senderID = g_network->getPeerID();
+
+        packet.chunkIndex = chunkIndex++;
+        packet.totalCount = totalCount;
+
+        uint32_t countInChunk = std::min((size_t)50, uids.size() - i);
+        packet.countInChunk = countInChunk;
+        packet.hasMore = i + 50 < uids.size();
+
+        for (uint32_t j = 0; i < countInChunk; j++){
+            strcpy(
+                packet.uids[j],
+                uids[i + j].c_str()
+            );
+        }
+        g_network->sendPacket(&packet, sizeof(packet));
+    }
+    
+    if (uids.empty()){
+        SelectPacket packet;
+        packet.header.type = PacketType::SELECT_CHANGE;
+        packet.header.timestamp = getCurrentTimestamp();
+        packet.header.senderID = g_network->getPeerID();
+        packet.chunkIndex = 0;
+        packet.totalCount = 0;
+        packet.countInChunk = 0;
+        packet.hasMore = false;
+        
+        g_network->sendPacket(&packet, sizeof(packet));
+    }
+}
+
+void SyncManager::onRemoteSelectionChanged(const std::string& userID){
+    if (m_remoteSelectionHighlights.contains(userID)){
+        log::warn("m_remoteSelectionHighlights does not contain {}", userID);
+        return;
+    }
+    if (m_remoteSelections.contains(userID)){
+        log::warn("m_remoteSelections does not contain {}", userID);
+        return;
+    }
+    // remove old highlights
+    auto& highlights = m_remoteSelectionHighlights[userID];
+    for (auto sprite : highlights){
+        if (sprite){
+            sprite->removeFromParent();
+        }
+    }
+    highlights.clear();
+
+    auto editor = getEditorLayer();
+    if (!editor) return;
+    if (!editor->m_objectLayer) return;
+
+    auto& selection = m_remoteSelections[userID];
+
+    for (const std::string& uid : selection){
+        auto it = m_syncedObjects.find(uid);
+        if (it == m_syncedObjects.end()) continue;
+
+        GameObject* obj = it->second;
+
+        auto highlight = CCSprite::create("square02_001.png");
+        if (!highlight){
+            log::error("highlight does not exist??");
+            continue;
+        }
+
+        // each user should have its own color
+        // for now remote selections will be cyan
+        highlight->setColor({0, 255, 255});
+        highlight->setOpacity(128);
+
+        CCSize objSize = obj->getContentSize();
+        highlight->setScaleX(objSize.width / highlight->getContentSize().width);
+        highlight->setScaleY(objSize.height / highlight->getContentSize().height);
+        
+        highlight->setPosition(obj->getPosition());
+        highlight->setRotation(obj->getRotation());
+        highlight->setZOrder(obj->getZOrder() + 1);
+        
+        editor->m_objectLayer->addChild(highlight);
+        highlights.push_back(highlight);
     }
 }
