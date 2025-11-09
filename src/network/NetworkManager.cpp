@@ -84,8 +84,7 @@ void NetworkManager::disconnect(){
     }
 
     if (m_host){
-        enet_host_destroy(m_host);
-        m_host = nullptr;
+        stopHosting();
     }
 }
 

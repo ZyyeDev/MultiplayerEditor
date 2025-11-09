@@ -47,7 +47,7 @@ struct ObjectData {
     bool dontFade;             // Don't fade effect
     
     // Group properties
-    std::array<int16_t, 10Ui64> groups;  // Group IDs
+    int16_t groups[10];         // Group IDs
     int groupCount;
     
     // Trigger properties (for triggers)
@@ -61,6 +61,7 @@ struct ObjectData {
     // Color trigger specific
     float fadeTime;
     int colorID;
+    int targetColor;
     float red, green, blue;
     float opacity;
     bool blending;

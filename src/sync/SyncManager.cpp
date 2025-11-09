@@ -56,6 +56,7 @@ LevelEditorLayer* SyncManager::getEditorLayer(){
     return scene->getChildByType<LevelEditorLayer>(0);
 }
 
+// TODO: Add more properties
 ObjectData SyncManager::extractObjectData(GameObject* obj){
     ObjectData data;
     memset(&data, 0, sizeof(data));
@@ -85,14 +86,36 @@ ObjectData SyncManager::extractObjectData(GameObject* obj){
     data.dontEnter = obj->m_isDontEnter;
     data.dontFade = obj->m_isDontFade;
 
-    // groups TODO
-    //data.groups = obj->m_groups;
+    // groups
+    /*
+    TODO: m_groups appears to be incorrectly bound in geode?
+    maybe im just dumb but idk what to do
+    data.groupCount = 0;
+    auto objGroups = obj->m_groups;
+    if (objGroups) {
+        int groupsCount = objGroups->count();
+        for (int i = 0; i < groupsCount && i < 10; i++) {
+            auto groupInt = static_cast<CCInteger*>(objGroups->objectAtIndex(i));
+            data.groups[i] = static_cast<int16_t>(groupInt->getValue());
+            data.groupCount++;
+        }
+    } */
 
     // visibility
     data.isVisible = obj->isVisible();
     data.highDetail = obj->m_isHighDetail;
 
-    // Triggers
+    // link and unique
+    data.linkedGroup = obj->m_linkedGroup;
+    data.uniqueID = obj->m_uniqueID;
+
+    // Text objects
+    if (auto* textObj = typeinfo_cast<TextGameObject*>(obj)) {
+        strncpy(data.textString, textObj->m_text.c_str(), 255);
+        data.textString[255] = '\0';
+    }
+
+    // Triggers - only sync properties that actually exist
     if (auto* effectObj = typeinfo_cast<EffectGameObject*>(obj)) {
         data.duration = effectObj->m_duration;
         data.targetGroupID = effectObj->m_targetGroupID;
@@ -100,16 +123,8 @@ ObjectData SyncManager::extractObjectData(GameObject* obj){
         data.spawnTriggered = effectObj->m_isSpawnTriggered;
         data.multiTrigger = effectObj->m_isMultiTriggered;
         
-        // Color trigger properties
-        if (effectObj->m_targetColor) {
-            data.colorID = effectObj->m_targetColor;
-            data.red = effectObj->getColor().r / 255.0f;
-            data.green = effectObj->getColor().g / 255.0f;
-            data.blue = effectObj->getColor().b / 255.0f;
-            data.opacity = effectObj->m_opacity;
-            data.fadeTime = effectObj->m_fadeInDuration;
-            data.blending = effectObj->m_usesBlending;
-        }
+        // Color properties
+        data.opacity = effectObj->m_opacity;
         
         // Move trigger properties
         data.moveX = effectObj->m_moveModX;
@@ -127,10 +142,13 @@ ObjectData SyncManager::extractObjectData(GameObject* obj){
         // Follow trigger
         data.followXMod = effectObj->m_followXMod;
         data.followYMod = effectObj->m_followYMod;
+        data.followYSpeed = effectObj->m_followYSpeed;
+        data.followYDelay = effectObj->m_followYDelay;
+        data.followYOffset = effectObj->m_followYOffset;
+        data.followYMaxSpeed = effectObj->m_followYMaxSpeed;
         
         // Pulse trigger
         data.pulseMode = effectObj->m_pulseMode;
-        data.pulseType = effectObj->m_pulseTargetType;
         data.fadeIn = effectObj->m_fadeInDuration;
         data.hold = effectObj->m_holdDuration;
         data.fadeOut = effectObj->m_fadeOutDuration;
@@ -138,44 +156,18 @@ ObjectData SyncManager::extractObjectData(GameObject* obj){
         data.detailOnly = effectObj->m_pulseDetailOnly;
         data.exclusiveMode = effectObj->m_pulseExclusive;
         
-        // Spawn trigger
-        data.delayTime = effectObj->m_spawnTriggerDelay;
-        
-        // Collision
-        data.activateOnExit = effectObj->m_triggerOnExit;
-        // TODO: Find these
-        //data.blockAID = effectObj->;
-        //data.blockBID = effectObj->;
-        
-        // Alpha trigger
-        data.targetOpacity = effectObj->m_opacity;
-        
-        // Item ID (for count triggers, pickup, etc)
-        data.itemID = effectObj->m_itemID;
-        data.targetCount = effectObj->m_itemID2; // i think its itemID2
-        
+        // Common trigger properties
         data.centerGroupID = effectObj->m_centerGroupID;
         data.shakeStrength = effectObj->m_shakeStrength;
         data.shakeInterval = effectObj->m_shakeInterval;
         data.animationID = effectObj->m_animationID;
         data.activateGroup = effectObj->m_activateGroup;
-        /*
-        TODO: Find these
-        data.comparison = effectObj->m_comparison;
-        data.holdMode = effectObj->m_holdMode;
-        data.toggleMode = effectObj->m_toggleMode;
-        data.multiActivate = effectObj->m_multiActivate;
+        data.itemID = effectObj->m_itemID;
+        data.targetColor = effectObj->m_targetColor;
         
-        data.targetPosMode = effectObj->m_targetPosMode;
-        data.targetPosXMod = effectObj->m_targetPosXMod;
-        data.targetPosYMod = effectObj->m_targetPosYMod;
-        data.dynamicMode = effectObj->m_dynamicMode;
-        */
+        // Trigger exit
+        data.triggerOnExit = effectObj->m_triggerOnExit;
     }
-
-    // other
-    data.linkedGroup = obj->m_linkedGroup;
-    data.uniqueID = obj->m_uniqueID;
 
     return data;
 }
@@ -192,6 +184,32 @@ void SyncManager::applyObjectData(GameObject* obj, const ObjectData& data) {
     obj->setZOrder(data.zOrder);
     obj->m_editorLayer = data.editorLayer;
     obj->m_editorLayer2 = data.editorLayer2;
+
+    // groups
+    /*
+    TODO: m_groups appears to be incorrectly bound in geode?
+    maybe im just dumb but idk what to do
+    auto objGroups = obj->m_groups;
+    if (objGroups) {
+        objGroups->removeAllObjects();
+        for (int i = 0; i < data.groupCount && i < 10; i++) {
+            objGroups->addObject(CCInteger::create(data.groups[i]));
+        }
+    }*/
+
+    // color properties
+    obj->m_activeMainColorID = data.baseColorID;
+    obj->m_activeDetailColorID = data.detailColorID;
+    obj->m_isDontEnter = data.dontEnter;
+    obj->m_isDontFade = data.dontFade;
+
+    // visibility
+    obj->setVisible(data.isVisible);
+    obj->m_isHighDetail = data.highDetail;
+
+    // other
+    obj->m_linkedGroup = data.linkedGroup;
+    obj->m_uniqueID = data.uniqueID;
 }
 
 GameObject* SyncManager::createObjectFromData(const ObjectData& data){
