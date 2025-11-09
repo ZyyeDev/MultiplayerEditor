@@ -13,6 +13,8 @@ enum class PacketType : uint8_t {
     OBJECT_ADD = 2,
     OBJECT_DELETE = 3,
     OBJECT_UPDATE = 4,
+    MOUSE_MOVE = 5,
+    SELECT_CHANGE = 6,
 };
 
 #pragma pack(push, 1)
@@ -20,6 +22,7 @@ enum class PacketType : uint8_t {
 struct PacketHeader{
     PacketType type;
     uint32_t timestamp;
+    std::string senderID;
 };
 
 struct ObjectData {
@@ -432,6 +435,21 @@ struct FullSyncPacket {
     PacketHeader header;
     uint32_t objectCount;
     // TODO: Send complete level, with all objects
+};
+
+struct MousePacket{
+    PacketHeader header;
+    int x;
+    int y;
+};
+
+struct SelectPacket{
+    PacketHeader header;
+    bool hasMore; // indicates more packets coming (50 objects per select packet)
+    uint32_t chunkIndex;
+    uint32_t totalCount;
+    uint32_t countInChunk;
+    char uids[50][32];
 };
 
 #pragma pack(pop)

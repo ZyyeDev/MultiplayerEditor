@@ -10,5 +10,10 @@
 	"name": "MultiplayerEditor",
 	"version": "v0.0.1-alpha",
 	"developer": "",
-	"description": ""
+	"description": "",
+    "resources": {	
+        "sprites": [
+            "resources/*.png"
+        ]
+    }
 }

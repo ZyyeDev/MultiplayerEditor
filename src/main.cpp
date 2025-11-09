@@ -19,6 +19,8 @@ int port = 7777; // this isnt used at all, must be implemented in the future!!
 bool g_isHost = false;
 bool g_isInSession = false;
 
+CCPoint lastMousePos = ccp(0,0);
+
 $on_mod(Loaded){
     if (enet_initialize() != 0) {
         log::error("Failed to initialize ENet!");
@@ -43,8 +45,25 @@ class $modify(CCScheduler) {
     void update(float dt) {
         CCScheduler::update(dt);
         
-        if (g_network) {
+        if (g_isInSession && g_network) {
             g_network->poll();
+        }
+
+        if (g_isInSession && g_sync){
+            auto editorLayer = LevelEditorLayer::get();
+            if (editorLayer && editorLayer->m_objectLayer){
+                auto director = CCDirector::sharedDirector();
+                auto mousePos = director->getOpenGLView()->getMousePosition();
+
+                // convert screen coords to world coords
+                CCPoint worldPos = editorLayer->m_objectLayer->convertToNodeSpace(mousePos);
+                
+                float distance = ccpDistance(lastMousePos,worldPos);
+                if (distance > 2.0f){
+                    g_sync->onLocalCursorUpdate(worldPos);
+                    lastMousePos = worldPos;
+                }
+            }
         }
     }
 };

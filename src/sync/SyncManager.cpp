@@ -7,7 +7,12 @@ extern NetworkManager* g_network;
 extern bool g_isHost;
 
 SyncManager::SyncManager() : m_objectCounter(0), m_lastUpdateTimestamp(0) {
-    m_userID = g_isHost ? "host" : "client";
+    if (g_isHost){
+        m_userID = "host";
+    }else{
+        uint32_t peerID = g_network->getPeerID();
+        m_userID = "peer_" + std::to_string(peerID);
+    }
 
     g_network->setOnRecive([this](const uint8_t* data, size_t size){
         this->handlePacket(data, size);
@@ -209,6 +214,7 @@ void SyncManager::onLocalObjectAdded(GameObject*obj){
     ObjectAddPacket packet;
     packet.header.type = PacketType::OBJECT_ADD;
     packet.header.timestamp = getCurrentTimestamp();
+    packet.header.senderID = g_network->getPeerID();
     packet.object = extractObjectData(obj);
 
     g_network->sendPacket(&packet, sizeof(packet));
@@ -223,6 +229,7 @@ void SyncManager::onLocalObjectDestroyed(GameObject* obj) {
     ObjectDeletePacket packet;
     packet.header.type = PacketType::OBJECT_DELETE;
     packet.header.timestamp = getCurrentTimestamp();
+    packet.header.senderID = g_network->getPeerID();
     strncpy(packet.uid, uid.c_str(), 31);
     
     g_network->sendPacket(&packet, sizeof(packet));
@@ -237,6 +244,7 @@ void SyncManager::onLocalObjectModified(GameObject* obj) {
     ObjectModifyPacket packet;
     packet.header.type = PacketType::OBJECT_UPDATE;
     packet.header.timestamp = getCurrentTimestamp();
+    packet.header.senderID = g_network->getPeerID();
     packet.object = extractObjectData(obj);
     
     g_network->sendPacket(&packet, sizeof(packet));
@@ -339,6 +347,11 @@ void SyncManager::handlePacket(const uint8_t* data, size_t size) {
             onRemoteObjectModified(*packet);
             break;
         }
+        case PacketType::MOUSE_MOVE: {
+            const MousePacket* packet = reinterpret_cast<const MousePacket*>(data);
+            onRemoteCursorUpdate(packet->header.senderID, packet->x, packet->y);
+            break;
+        }
         default:
             log::warn("Unknown packet type: {}", (int)header->type);
             break;
@@ -351,4 +364,41 @@ bool SyncManager::shouldApplyUpdate(uint32_t remoteTimestamp) {
         return true;
     }
     return false;
+}
+
+void SyncManager::onLocalCursorUpdate(CCPoint position){
+    m_CursorPos = position;
+    
+    MousePacket packet;
+    packet.header.type = PacketType::MOUSE_MOVE;
+    packet.header.timestamp = getCurrentTimestamp();
+    packet.header.senderID = g_network->getPeerID();
+    packet.x = position.x;
+    packet.y = position.y;
+    
+    g_network->sendPacket(&packet, sizeof(packet));
+}
+
+void SyncManager::onRemoteCursorUpdate(const std::string& userID, int x, int y){
+    auto it = m_remoteCursors.find(userID);
+
+    CCPoint position = ccp(x, y);
+
+    if (it == m_remoteCursors.end()){
+        auto editor = getEditorLayer();
+        if (!editor){
+            return;
+        }
+        if (!editor->m_objectLayer){
+            return;
+        }
+
+        auto cursor = CCSprite::create("cursor.png"_spr);
+        editor->m_objectLayer->addChild(cursor, 9999);
+        cursor->setPosition(position);
+
+        m_remoteCursors[userID] = cursor;
+    }else{
+        it->second->setPosition(position);
+    }
 }

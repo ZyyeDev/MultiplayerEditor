@@ -19,6 +19,13 @@ class NetworkManager{
         bool connect(const std::string& ip, uint16_t port = 7777);
         void disconnect();
 
+        uint32_t getPeerID() const {
+            if (m_peer){
+                return m_peer->connectID;
+            }
+            return 0;
+        }
+
         void sendPacket(const void* data, size_t size);
         void poll();
 

@@ -10,6 +10,12 @@ extern SyncManager* g_sync;
 extern bool g_isInSession;
 extern bool g_isHost;
 
+void objectModified(GameObject* object){
+    if (g_isInSession){
+        g_sync->onLocalObjectModified(object);
+    }
+}
+
 class $modify(LevelEditorLayer){
     /* -- add obj -- */
     void addSpecial(GameObject* p0) {
@@ -44,12 +50,38 @@ class $modify(EditorUI){
     void transformObjectCall(EditCommand cmd) {
         EditorUI::transformObjectCall(cmd);
 
-        if (g_isInSession){
+        auto selected = this->getSelectedObjects();
+        for (auto obj : CCArrayExt<GameObject*>(selected)){
+            objectModified(obj);
+        }
+    }
+
+    void scaleObjects(CCArray* p0, float p1, float p2, CCPoint p3, ObjectScaleType p4, bool p5) {
+        for (auto obj : CCArrayExt<GameObject*>(p0)){
+            objectModified(obj);
+        }
+        EditorUI::scaleObjects(p0, p1, p2, p3, p4, p5);
+    }
+
+    void rotateObjects(CCArray* p0, float p1, CCPoint p2) {
+        for (auto obj : CCArrayExt<GameObject*>(p0)){
+            objectModified(obj);
+        }
+        EditorUI::rotateObjects(p0, p1, p2);
+    }
+
+    // idk if this is really related to transform things, but ill leave it just in case
+    void updateButtons() {
+        if (g_isInSession && g_sync && !g_sync->isApplyingRemoteChanges()) {
             auto selected = this->getSelectedObjects();
-            for (auto obj : CCArrayExt<GameObject*>(selected)){
-                g_sync->onLocalObjectModified(obj);
+            if (selected && selected->count() > 0) {
+                for (auto obj : CCArrayExt<GameObject*>(selected)) {
+                    g_sync->onLocalObjectModified(obj);
+                }
             }
         }
+
+        EditorUI::updateButtons();
     }
     /* -- delete --*/
     void onDeleteSelected(CCObject* sender) {
@@ -62,5 +94,23 @@ class $modify(EditorUI){
         }
 
         EditorUI::onDeleteSelected(sender);
+    }
+
+    void ccTouchMoved(CCTouch* touch, CCEvent* event) {
+        EditorUI::ccTouchMoved(touch, event);
+
+        if (g_isInSession && g_sync){
+            CCPoint screenPos = touch->getLocation();
+
+            auto editorLayer = LevelEditorLayer::get();
+            if (!editorLayer) return;
+
+            auto objLayer = editorLayer->m_objectLayer;
+            if (!objLayer) return;
+
+            CCPoint worldPos = objLayer->convertToNodeSpace(screenPos);
+
+            g_sync->onLocalCursorUpdate(worldPos);
+        }
     }
 };

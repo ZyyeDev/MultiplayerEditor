@@ -38,6 +38,7 @@ class SyncManager{
         bool m_applyingRemoteChanges = false;
 
         /* -- selection -- */
+        std::map<std::string, CCSprite*> m_remoteCursors;
         CCPoint m_CursorPos;
         CCArray* m_Selection;
 
@@ -64,7 +65,7 @@ class SyncManager{
         void onRemoteObjectModified(const ObjectModifyPacket& packet);
 
         // selection stuff
-        void onRemoteCursorUpdate(CCPoint position);
+        void onRemoteCursorUpdate(const std::string& userID, int x, int y);
         void onRemoteSelectionChanged(const std::vector<std::string>& uids);
 
         /* --- FULL SYNC --- */
