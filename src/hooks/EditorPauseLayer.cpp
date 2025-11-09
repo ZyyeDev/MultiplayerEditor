@@ -25,6 +25,20 @@ class $modify(CollabEditorPauseLayer, EditorPauseLayer){
             return true;
         }
 
+        if (g_isInSession){
+            auto saveBtn = typeinfo_cast<CCMenuItemSpriteExtra*>(menu->getChildByID("save-button"));
+            if (saveBtn){
+                saveBtn->setEnabled(false);
+                saveBtn->setOpacity(100);
+            }
+
+            auto saveAndExitBtn = typeinfo_cast<CCMenuItemSpriteExtra*>(menu->getChildByID("save-and-exit-button"));
+            if (saveAndExitBtn) {
+                saveAndExitBtn->setEnabled(false);
+                saveAndExitBtn->setOpacity(100);
+            }
+        }
+
         auto hostSprite = ButtonSprite::create(
             "Host Session",
             "goldFont.fnt",
@@ -43,6 +57,39 @@ class $modify(CollabEditorPauseLayer, EditorPauseLayer){
         menu->updateLayout();
 
         return true;
+    }
+
+    void onExitEditor(CCObject* sender) {
+        if (g_isInSession){
+            handleExit(sender);
+        }else{
+            EditorPauseLayer::onExitEditor(sender);
+        }
+    }
+
+    void onSaveAndExit(CCObject* sender) {
+        if (g_isInSession){
+            handleExit(sender);
+        }else{
+            EditorPauseLayer::onSaveAndExit(sender);
+        }
+    }
+
+    void onExitNoSave(CCObject* sender) {
+        if (g_isInSession){
+            handleExit(sender);
+        }else{
+            EditorPauseLayer::onExitNoSave(sender);
+        }
+    }
+
+    void handleExit(CCObject* sender){
+        g_network->disconnect();
+
+        g_isInSession = false;
+        g_isHost = false;
+        
+        EditorPauseLayer::onExitEditor(sender);
     }
 
     void onHostSession(CCObject*) {
