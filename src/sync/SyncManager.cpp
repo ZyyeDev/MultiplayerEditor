@@ -28,8 +28,8 @@ void SyncManager::trackObject(const std::string& uid, GameObject* obj){
 void SyncManager::untrackObject(const std::string& uid){
     auto thing = m_syncedObjects.find(uid);
     if (thing != m_syncedObjects.end()){
-        m_syncedObjects.erase(thing);
         m_objectToUID.erase(thing->second);
+        m_syncedObjects.erase(thing);
     }
 }
 
@@ -250,23 +250,16 @@ void SyncManager::onRemoteObjectAdded(const ObjectAddPacket& packet) {
         return;
     }
     
-    GameObject* obj = createObjectFromData(packet.object);
+    m_applyingRemoteChanges = true;
+    
+    auto obj = editor->createObject(packet.object.objectID, {packet.object.x, packet.object.y}, false);
     if (!obj) {
         log::error("Failed to create object from data!");
+        m_applyingRemoteChanges = false;
         return;
     }
     
-    m_applyingRemoteChanges = true;
-    
-    editor->m_objects->addObject(obj);
-    
-    auto objectLayer = editor->m_objectLayer;
-    if (objectLayer) {
-        objectLayer->addChild(obj);
-        obj->setPosition(ccp(packet.object.x, packet.object.y));
-    } else {
-        log::error("No object layer found!");
-    }
+    applyObjectData(obj, packet.object);
     
     m_applyingRemoteChanges = false;
     
@@ -276,21 +269,34 @@ void SyncManager::onRemoteObjectAdded(const ObjectAddPacket& packet) {
 
 void SyncManager::onRemoteObjectDestroyed(const ObjectDeletePacket& packet) {
     auto it = m_syncedObjects.find(packet.uid);
-    if (it == m_syncedObjects.end()) return;
+    if (it == m_syncedObjects.end()) {
+        log::warn("Tried to delete nonexistent object: {}", packet.uid);
+        return;
+    }
     
     auto editor = getEditorLayer();
-    if (!editor) return;
+    if (!editor) {
+        log::error("No editor layer for destroy!");
+        return;
+    }
     
     GameObject* obj = it->second;
-    editor->removeObject(obj, true);
+    
     untrackObject(packet.uid);
     
-    log::info("Deleted remote object: {}", packet.uid);
+    m_applyingRemoteChanges = true;
+    editor->removeObject(obj, true);
+    m_applyingRemoteChanges = false;
+    
+    log::info("Deleted object: {}", packet.uid);
 }
 
 void SyncManager::onRemoteObjectModified(const ObjectModifyPacket& packet) {
     auto it = m_syncedObjects.find(packet.object.uid);
-    if (it == m_syncedObjects.end()) return;
+    if (it == m_syncedObjects.end()) {
+        log::warn("Tried to modify nonexistent object: {}", packet.object.uid);
+        return;
+    }
     
     GameObject* obj = it->second;
     applyObjectData(obj, packet.object);
