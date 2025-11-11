@@ -124,7 +124,7 @@ class $modify(EditorUI){
     void selectBuildTab(int p0) {
         EditorUI::selectBuildTab(p0);
 
-        if (p0 == 4){
+        if (p0 == 5){
             log::info("change to tab {}",p0);
             settingsUpdate();
         }
@@ -143,5 +143,22 @@ class $modify(EditorUI){
     void songStateChanged() {
         EditorUI::songStateChanged();
         settingsUpdate();
+    }
+
+    void selectObjects(CCArray* objects, bool idk) {
+        EditorUI::selectObjects(objects, idk);
+        
+        if (g_isInSession && g_sync && !g_sync->isApplyingRemoteChanges()){
+            g_sync->onLocalSelectionChanged(objects);
+        }
+    }
+
+    void deselectAll() {
+        if (g_isInSession && g_sync && !g_sync->isApplyingRemoteChanges()){
+            auto emptyArray = CCArray::create();
+            g_sync->onLocalSelectionChanged(emptyArray);
+        }
+        
+        EditorUI::deselectAll();
     }
 };
