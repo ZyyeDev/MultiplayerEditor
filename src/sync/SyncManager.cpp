@@ -173,6 +173,8 @@ ObjectData SyncManager::extractObjectData(GameObject* obj){
 }
 
 void SyncManager::applyObjectData(GameObject* obj, const ObjectData& data) {
+    if (!obj) return;
+
     obj->setPositionX(data.x);
     obj->setPositionY(data.y);
     obj->setRotation(data.rotation);
@@ -234,7 +236,6 @@ void SyncManager::onLocalObjectAdded(GameObject*obj){
     packet.object = extractObjectData(obj);
 
     g_network->sendPacket(&packet, sizeof(packet));
-    log::info("Set object add: {}",uid);
 }
 
 void SyncManager::onLocalObjectDestroyed(GameObject* obj) {
@@ -250,8 +251,6 @@ void SyncManager::onLocalObjectDestroyed(GameObject* obj) {
     
     g_network->sendPacket(&packet, sizeof(packet));
     untrackObject(uid);
-    
-    log::info("Sent object delete: {}", uid);
 }
 
 void SyncManager::onLocalObjectModified(GameObject* obj) {
@@ -264,7 +263,6 @@ void SyncManager::onLocalObjectModified(GameObject* obj) {
     packet.object = extractObjectData(obj);
     
     g_network->sendPacket(&packet, sizeof(packet));
-    log::info("Sent object modify: {}", getObjectUid(obj));
 }
 
 void SyncManager::onRemoteObjectAdded(const ObjectAddPacket& packet) {
@@ -288,7 +286,6 @@ void SyncManager::onRemoteObjectAdded(const ObjectAddPacket& packet) {
     m_applyingRemoteChanges = false;
     
     trackObject(packet.object.uid, obj);
-    log::info("Added remote object: {}", packet.object.uid);
 }
 
 void SyncManager::onRemoteObjectDestroyed(const ObjectDeletePacket& packet) {
@@ -311,8 +308,6 @@ void SyncManager::onRemoteObjectDestroyed(const ObjectDeletePacket& packet) {
     m_applyingRemoteChanges = true;
     editor->removeObject(obj, true);
     m_applyingRemoteChanges = false;
-    
-    log::info("Deleted object: {}", packet.uid);
 }
 
 void SyncManager::onRemoteObjectModified(const ObjectModifyPacket& packet) {
@@ -324,8 +319,6 @@ void SyncManager::onRemoteObjectModified(const ObjectModifyPacket& packet) {
     
     GameObject* obj = it->second;
     applyObjectData(obj, packet.object);
-    
-    log::info("Modified remote object: {}", packet.object.uid);
 }
 
 void SyncManager::sendFullState() {
@@ -338,8 +331,23 @@ void SyncManager::sendFullState() {
     log::info("Sending full state: {} objects", allObjects->count());
     
     for (auto obj : CCArrayExt<GameObject*>(allObjects)) {
-        onLocalObjectAdded(obj);
+        if (!isTrackedObject(obj)){
+            std::string uid = generateUID();
+            trackObject(uid, obj);
+        }
     }
+    
+    for (auto obj : CCArrayExt<GameObject*>(allObjects)){
+        ObjectAddPacket packet;
+        packet.header.type = PacketType::OBJECT_ADD;
+        packet.header.timestamp = getCurrentTimestamp();
+        packet.header.senderID = g_network->getPeerID();
+        packet.object = extractObjectData(obj);
+
+        g_network->sendPacket(&packet, sizeof(packet));
+    }
+
+    onLocalLevelSettingsChanged();
 }
 
 void SyncManager::handlePacket(const uint8_t* data, size_t size) {
@@ -411,17 +419,22 @@ bool SyncManager::shouldApplyUpdate(uint32_t remoteTimestamp) {
 }
 
 void SyncManager::onLocalCursorUpdate(CCPoint position){
+    float distance = ccpDistance(m_CursorPos, position);
+    if (distance < 0.5f) return;
+
     m_CursorPos = position;
     
     MousePacket packet;
     packet.header.type = PacketType::MOUSE_MOVE;
     packet.header.timestamp = getCurrentTimestamp();
     packet.header.senderID = g_network->getPeerID();
+    
     packet.x = position.x;
     packet.y = position.y;
     
     g_network->sendPacket(&packet, sizeof(packet));
 }
+
 void SyncManager::onRemoteCursorUpdate(const std::string& userID, int x, int y){
     auto it = m_remoteCursors.find(userID);
 
@@ -442,19 +455,25 @@ void SyncManager::onRemoteCursorUpdate(const std::string& userID, int x, int y){
             return;
         }
         
-        editor->m_objectLayer->addChild(cursor, 9999);
+        editor->m_objectLayer->addChild(cursor);
+        cursor->setZOrder(INT_MAX);
         cursor->setPosition(position);
         
         // this should show they gd name, not userID
         auto label = CCLabelBMFont::create(userID.c_str(), "chatFont.fnt");
         label->setScale(0.5f);
-        label->setPosition(ccp(cursor->getContentSize().width / 2, cursor->getContentSize().height + 10));
         cursor->addChild(label);
+        label->setPosition(
+            ccp(
+                cursor->getContentSize().width / 2,
+                cursor->getContentSize().height + 5
+             ));
 
         m_remoteCursors[userID] = cursor;
         
         log::info("created cursor for user: {}", userID);
     } else {
+        log::info("update mouse to {}",position);
         it->second->setPosition(position);
     }
 }
@@ -488,7 +507,7 @@ void SyncManager::onLocalSelectionChanged(CCArray* selectedObjects){
         packet.countInChunk = countInChunk;
         packet.hasMore = i + 50 < uids.size();
 
-        for (uint32_t j = 0; i < countInChunk; j++){
+        for (uint32_t j = 0; j < countInChunk; j++){
             strcpy(
                 packet.uids[j],
                 uids[i + j].c_str()
@@ -512,6 +531,9 @@ void SyncManager::onLocalSelectionChanged(CCArray* selectedObjects){
 }
 
 void SyncManager::onRemoteSelectionChanged(const std::string& userID){
+    if (m_remoteSelectionHighlights.empty()){
+        return;
+    }
     if (m_remoteSelectionHighlights.contains(userID)){
         log::warn("m_remoteSelectionHighlights does not contain {}", userID);
         return;
@@ -704,4 +726,19 @@ void SyncManager::onLocalLevelSettingsChanged() {
     
     g_network->sendPacket(&packet, sizeof(packet));
     log::info("sent level settings to remote!");
+}
+
+void SyncManager::trackExistingObjects(){
+    auto editor = getEditorLayer();
+    if (!editor) return;
+
+    auto allObjects = editor->m_objects;
+    if (!allObjects) return;
+
+    for (auto obj : CCArrayExt<GameObject*>(allObjects)) {
+        if (!isTrackedObject(obj)){
+            std::string uid = generateUID();
+            trackObject(uid, obj);
+        }
+    }
 }

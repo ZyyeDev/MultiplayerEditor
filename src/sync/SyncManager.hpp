@@ -26,7 +26,7 @@ class SyncManager{
 
         GameObject* createObjectFromData(const ObjectData& data);
         void applyObjectData(GameObject* obj, const ObjectData& data);
-    
+
         ObjectData extractObjectData(GameObject* obj);
 
         bool shouldApplyUpdate(uint32_t remoteTimestamp);
@@ -79,7 +79,8 @@ class SyncManager{
         /* --- FULL SYNC --- */
         void sendFullState();
         void reciveFullState(const uint8_t* data, size_t size);
-
+        void trackExistingObjects();
+        
         /* -- OTHERS -- */
         void handlePacket(const uint8_t* data, size_t size);
 

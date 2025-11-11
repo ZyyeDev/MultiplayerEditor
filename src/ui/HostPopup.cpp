@@ -77,6 +77,8 @@ void HostPopup::onStartHost(CCObject*){
         // it should show local ip, or hamachi ip (or whatever the user is using)
         m_ipLabel->setString("127.0.0.1:7777");
 
+        g_sync->trackExistingObjects();
+        
         log::info("it works!!! :3");
         
         // TODO
