@@ -15,7 +15,7 @@ SyncManager::SyncManager() : m_objectCounter(0), m_lastUpdateTimestamp(0) {
 }
 
 std::string SyncManager::generateUID() {
-    return m_userID + "_" + std::to_string(m_objectCounter++);
+    return std::to_string(m_userID) + "_" + std::to_string(m_objectCounter++);
 }
 
 void SyncManager::trackObject(const std::string& uid, GameObject* obj){
