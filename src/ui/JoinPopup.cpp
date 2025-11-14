@@ -76,7 +76,7 @@ void JoinPopup::OnJoin(CCObject*){
         g_isHost = false;
         g_isInSession = true;
 
-        g_sync->setUserID("client");
+        g_sync->setUserID(g_network->getPeerID());
 
         this->onClose(nullptr);
 

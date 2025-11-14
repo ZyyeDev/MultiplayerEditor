@@ -71,7 +71,7 @@ void HostPopup::onStartHost(CCObject*){
         g_isHost = true;
         g_isInSession = true;
 
-        g_sync->setUserID("host");
+        g_sync->setUserID(g_network->getPeerID());
 
         // for now, just show local ip
         // it should show local ip, or hamachi ip (or whatever the user is using)
