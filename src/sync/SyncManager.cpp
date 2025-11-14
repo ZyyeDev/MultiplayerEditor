@@ -7,12 +7,7 @@ extern NetworkManager* g_network;
 extern bool g_isHost;
 
 SyncManager::SyncManager() : m_objectCounter(0), m_lastUpdateTimestamp(0) {
-    if (g_isHost){
-        m_userID = "host";
-    }else{
-        uint32_t peerID = g_network->getPeerID();
-        m_userID = "peer_" + std::to_string(peerID);
-    }
+    m_userID = g_network->getPeerID();
 
     g_network->setOnRecive([this](const uint8_t* data, size_t size){
         this->handlePacket(data, size);
@@ -81,25 +76,13 @@ ObjectData SyncManager::extractObjectData(GameObject* obj){
     data.editorLayer2 = obj->m_editorLayer2;
 
     // color properties
-    data.baseColorID = obj->m_activeMainColorID; // i think its this?
+    data.baseColorID = *obj->m_baseColor; // i think its this?
     data.detailColorID = obj->m_activeDetailColorID;
     data.dontEnter = obj->m_isDontEnter;
     data.dontFade = obj->m_isDontFade;
 
     // groups
-    /*
-    TODO: m_groups appears to be incorrectly bound in geode?
-    maybe im just dumb but idk what to do
-    data.groupCount = 0;
-    auto objGroups = obj->m_groups;
-    if (objGroups) {
-        int groupsCount = objGroups->count();
-        for (int i = 0; i < groupsCount && i < 10; i++) {
-            auto groupInt = static_cast<CCInteger*>(objGroups->objectAtIndex(i));
-            data.groups[i] = static_cast<int16_t>(groupInt->getValue());
-            data.groupCount++;
-        }
-    } */
+    data.groups = obj->m_groups;
 
     // visibility
     data.isVisible = obj->isVisible();
@@ -188,19 +171,10 @@ void SyncManager::applyObjectData(GameObject* obj, const ObjectData& data) {
     obj->m_editorLayer2 = data.editorLayer2;
 
     // groups
-    /*
-    TODO: m_groups appears to be incorrectly bound in geode?
-    maybe im just dumb but idk what to do
-    auto objGroups = obj->m_groups;
-    if (objGroups) {
-        objGroups->removeAllObjects();
-        for (int i = 0; i < data.groupCount && i < 10; i++) {
-            objGroups->addObject(CCInteger::create(data.groups[i]));
-        }
-    }*/
+    obj->m_groups = data.groups;
 
     // color properties
-    obj->m_activeMainColorID = data.baseColorID;
+    *obj->m_baseColor = data.baseColorID;
     obj->m_activeDetailColorID = data.detailColorID;
     obj->m_isDontEnter = data.dontEnter;
     obj->m_isDontFade = data.dontFade;
@@ -403,6 +377,20 @@ void SyncManager::handlePacket(const uint8_t* data, size_t size) {
         case PacketType::LEVEL_SETTINGS: {
             const LevelSettingsPacket* packet = reinterpret_cast<const LevelSettingsPacket*>(data);
             onRemoteLevelSettingsChanged(*packet);
+            break;
+        }
+        case PacketType::PLAYER_POSITION: {
+            const PlayerPositionPacket* packet = reinterpret_cast<const PlayerPositionPacket*>(data);
+            
+            auto editorLayer = getEditorLayer();
+            if (editorLayer){
+                log::info("remote plr pos");
+                onRemotePlayerPosition(*packet, editorLayer);
+            }else{
+                log::error("editor layer does not exist!");
+            }
+
+            break;
         }
         default:
             log::warn("Unknown packet type: {}", (int)header->type);
@@ -435,7 +423,7 @@ void SyncManager::onLocalCursorUpdate(CCPoint position){
     g_network->sendPacket(&packet, sizeof(packet));
 }
 
-void SyncManager::onRemoteCursorUpdate(const std::string& userID, int x, int y){
+void SyncManager::onRemoteCursorUpdate(const uint32_t& userID, int x, int y){
     auto it = m_remoteCursors.find(userID);
 
     CCPoint position = ccp(x, y);
@@ -459,8 +447,9 @@ void SyncManager::onRemoteCursorUpdate(const std::string& userID, int x, int y){
         cursor->setZOrder(INT_MAX);
         cursor->setPosition(position);
         
-        // this should show they gd name, not userID
-        auto label = CCLabelBMFont::create(userID.c_str(), "chatFont.fnt");
+        // TODO
+        /*
+        auto label = CCLabelBMFont::create(username, "chatFont.fnt");
         label->setScale(0.5f);
         cursor->addChild(label);
         label->setPosition(
@@ -468,12 +457,11 @@ void SyncManager::onRemoteCursorUpdate(const std::string& userID, int x, int y){
                 cursor->getContentSize().width / 2,
                 cursor->getContentSize().height + 5
              ));
-
+        */
         m_remoteCursors[userID] = cursor;
         
         log::info("created cursor for user: {}", userID);
     } else {
-        log::info("update mouse to {}",position);
         it->second->setPosition(position);
     }
 }
@@ -530,7 +518,7 @@ void SyncManager::onLocalSelectionChanged(CCArray* selectedObjects){
     }
 }
 
-void SyncManager::onRemoteSelectionChanged(const std::string& userID){
+void SyncManager::onRemoteSelectionChanged(const uint32_t& userID){
     if (m_remoteSelectionHighlights.empty()){
         return;
     }
@@ -583,7 +571,7 @@ void SyncManager::onRemoteSelectionChanged(const std::string& userID){
         highlight->setZOrder(obj->getZOrder() + 1);
         
         editor->m_objectLayer->addChild(highlight);
-        highlights.push_back(highlight);
+        m_remoteSelectionHighlights[userID].push_back(highlight);
     }
 }
 
@@ -741,4 +729,145 @@ void SyncManager::trackExistingObjects(){
             trackObject(uid, obj);
         }
     }
+}
+
+void SyncManager::updatePlayerSync(float dt, LevelEditorLayer* editorLayer){
+    if (!editorLayer) return;
+    
+    auto plr = editorLayer->m_player1;
+    if (!plr){
+        log::error("plr not found!!!");
+        return;
+    }
+
+    m_lastPlayerSendTime += dt;
+
+    if (m_lastPlayerSendTime >= 0.05f){
+        m_lastPlayerSendTime = 0.0f;
+        sendPlayerPosition(editorLayer);
+    }
+    
+    for (auto& [userId, remotePlr] : m_remotePlayers){
+        if (remotePlr.player && !remotePlr.player->m_isDead){
+            remotePlr.player->setVisible(true);
+        }
+    }
+}
+
+void SyncManager::sendPlayerPosition(LevelEditorLayer* editorLayer){
+    if (!editorLayer) return;
+    
+    auto plr = editorLayer->m_player1;
+    if (!plr){
+        log::error("plr not found while sending pos!!!");
+        return;
+    }
+
+    auto gameManager = GameManager::sharedState();
+    if (!gameManager) return;
+
+    PlayerPositionPacket packet;
+    packet.header.type = PacketType::PLAYER_POSITION;
+    packet.header.timestamp = getCurrentTimestamp();
+    packet.header.senderID = g_network->getPeerID();
+
+    packet.x = plr->getPositionX();
+    packet.y = plr->getPositionY();
+    packet.rotation = plr->getRotation();
+    packet.isUpsideDown = plr->m_isUpsideDown;
+    packet.isDead = plr->m_isDead;
+
+    packet.iconData.iconID = gameManager->getPlayerFrame();
+    packet.iconData.shipID = gameManager->getPlayerShip();
+    packet.iconData.ballID = gameManager->getPlayerBall();
+    packet.iconData.ufoID = gameManager->getPlayerBird();
+    packet.iconData.waveID = gameManager->getPlayerDart();
+    packet.iconData.robotID = gameManager->getPlayerRobot();
+    packet.iconData.spiderID = gameManager->getPlayerSpider();
+    packet.iconData.swingID = gameManager->getPlayerSwing();
+    packet.iconData.jetpackID = gameManager->getPlayerJetpack();
+    
+    packet.iconData.color1ID = gameManager->getPlayerColor();
+    packet.iconData.color2ID = gameManager->getPlayerColor2();
+    packet.iconData.glowColor = gameManager->getPlayerGlowColor();
+    packet.iconData.hasGlow = gameManager->getPlayerGlow();
+
+    g_network->sendPacket(&packet, sizeof(packet));
+}
+
+void SyncManager::onRemotePlayerPosition(const PlayerPositionPacket& packet, LevelEditorLayer* editorLayer) {
+    if (!editorLayer) return;
+    
+    uint32_t userId = packet.header.senderID;
+
+    auto it = m_remotePlayers.find(userId);
+
+    if (it == m_remotePlayers.end()) {
+        auto remotePlayer = PlayerObject::create(
+            packet.iconData.iconID,
+            packet.iconData.shipID,
+            editorLayer,
+            editorLayer->m_objectLayer,
+            false
+        );
+
+        if (!remotePlayer) {
+            log::error("Failed to create remote player!");
+            return;
+        }
+        
+        remotePlayer->setOpacity(200);
+        remotePlayer->setPosition(ccp(packet.x, packet.y));
+        remotePlayer->setRotation(packet.rotation);
+        remotePlayer->m_isUpsideDown = packet.isUpsideDown;
+        remotePlayer->m_isDead = packet.isDead;
+        
+        auto gameManager = GameManager::sharedState();
+        remotePlayer->setColor(gameManager->colorForIdx(packet.iconData.color1ID));
+        remotePlayer->setSecondColor(gameManager->colorForIdx(packet.iconData.color2ID));
+        remotePlayer->setZOrder(1000);
+        
+        if (packet.iconData.hasGlow) {
+            remotePlayer->enableCustomGlowColor(gameManager->colorForIdx(packet.iconData.glowColor));
+        } else {
+            remotePlayer->disableCustomGlowColor();
+        }
+        
+        editorLayer->m_objectLayer->addChild(remotePlayer);
+        
+        RemotePlayer rp;
+        rp.player = remotePlayer;
+        rp.userId = userId;
+        m_remotePlayers[userId] = rp;
+        
+        log::info("Created remote player for user: {}", userId);
+    } else {
+        auto remotePlayer = it->second.player;
+        if (!remotePlayer){
+            log::error("remote player is null!");
+            return;
+        }
+
+        remotePlayer->setPosition(ccp(packet.x, packet.y));
+        remotePlayer->setRotation(packet.rotation);
+        remotePlayer->m_isUpsideDown = packet.isUpsideDown;
+
+        if (packet.isDead) {
+            remotePlayer->m_isDead = true;
+            remotePlayer->setVisible(false);
+        } else {
+            remotePlayer->m_isDead = false;
+            remotePlayer->setVisible(true);
+        }
+    }
+}
+
+void SyncManager::cleanUpPlayers() {
+    for (auto& [userId, remotePlayer] : m_remotePlayers) {
+        if (remotePlayer.player) {
+            remotePlayer.player->removeFromParent();
+        }
+    }
+    m_remotePlayers.clear();
+    m_lastPlayerSendTime = 0.0f;
 }

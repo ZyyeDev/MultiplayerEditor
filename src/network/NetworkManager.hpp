@@ -23,6 +23,9 @@ class NetworkManager{
             if (m_peer){
                 return m_peer->connectID;
             }
+            if (m_isHost){
+                return 1;
+            }
             return 0;
         }
 

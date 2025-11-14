@@ -16,6 +16,7 @@ enum class PacketType : uint8_t {
     MOUSE_MOVE = 5,
     SELECT_CHANGE = 6,
     LEVEL_SETTINGS = 7,
+    PLAYER_POSITION = 8,
 };
 
 #pragma pack(push, 1)
@@ -23,7 +24,7 @@ enum class PacketType : uint8_t {
 struct PacketHeader{
     PacketType type;
     uint32_t timestamp;
-    std::string senderID;
+    uint32_t senderID;
 };
 
 struct ObjectData {
@@ -42,14 +43,13 @@ struct ObjectData {
     int editorLayer2;
     
     // Color properties
-    int baseColorID;           // Base color channel
+    GJSpriteColor baseColorID;           // Base color channel
     int detailColorID;         // Detail color channel
     bool dontEnter;            // Don't enter effect
     bool dontFade;             // Don't fade effect
     
     // Group properties
-    int16_t groups[10];         // Group IDs
-    int groupCount;
+    std::array<int16_t, 10Ui64> *groups;         // Group IDs
     
     // Trigger properties (for triggers)
     float duration;
@@ -480,6 +480,34 @@ struct LevelSettingsData{
 struct LevelSettingsPacket{
     PacketHeader header;
     LevelSettingsData settings;
+};
+
+struct PlayerIconData{
+    int iconID;
+    int shipID;
+    int ballID;
+    int ufoID;
+    int waveID;
+    int robotID;
+    int spiderID;
+    int swingID;
+    int jetpackID;
+    
+    int color1ID;
+    int color2ID;
+    int glowColor;
+    
+    bool hasGlow;
+};
+
+struct PlayerPositionPacket {
+    PacketHeader header;
+    float x;
+    float y;
+    float rotation;
+    bool isUpsideDown;
+    bool isDead;
+    PlayerIconData iconData;
 };
 
 struct SelectPacket{

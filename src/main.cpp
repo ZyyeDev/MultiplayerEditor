@@ -52,6 +52,9 @@ class $modify(CCScheduler) {
         if (g_isInSession && g_sync){
             auto editorLayer = LevelEditorLayer::get();
             if (editorLayer && editorLayer->m_objectLayer){
+                if (g_isInSession && g_sync && editorLayer->m_playbackMode == PlaybackMode::Playing) {
+                    g_sync->updatePlayerSync(dt, editorLayer);
+                }
                 auto director = CCDirector::sharedDirector();
                 auto glView = director->getOpenGLView();
                 if (!glView) return;
@@ -63,10 +66,10 @@ class $modify(CCScheduler) {
                 CCPoint worldPos = editorLayer->m_objectLayer->convertToNodeSpace(glPos);
                 
                 float distance = ccpDistance(lastMousePos, worldPos);
-                if (distance > 0.5f){
+                //if (distance > 0.5f){
                     g_sync->onLocalCursorUpdate(worldPos);
                     lastMousePos = worldPos;
-                }
+                //}
             }
         }
     }

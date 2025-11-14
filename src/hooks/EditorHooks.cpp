@@ -22,7 +22,11 @@ void settingsUpdate(){
     }
 }
 
-class $modify(LevelEditorLayer){
+class $modify(MyLevelEditorLayer, LevelEditorLayer){
+    struct Fields {
+        bool m_playtesting = false;
+    };
+
     /* -- add obj -- */
     void addSpecial(GameObject* p0) {
         LevelEditorLayer::addSpecial(p0);
@@ -48,6 +52,24 @@ class $modify(LevelEditorLayer){
                 }
             }
         }
+    }
+
+    void onPlaytest() {
+        log::info("start playtest");
+        m_fields->m_playtesting = true;
+        
+        LevelEditorLayer::onPlaytest();
+    }
+
+    void onStopPlaytest() {
+        log::info("stop playtest");
+        
+        m_fields->m_playtesting = false;
+        if (g_sync) {
+            g_sync->cleanUpPlayers();
+        }
+        
+        LevelEditorLayer::onStopPlaytest();
     }
 };
 
@@ -89,6 +111,7 @@ class $modify(EditorUI){
 
         EditorUI::updateButtons();
     }
+    
     /* -- delete --*/
     void onDeleteSelected(CCObject* sender) {
         auto selected = this->getSelectedObjects();
@@ -123,8 +146,8 @@ class $modify(EditorUI){
     // possible settings modified
     void selectBuildTab(int p0) {
         EditorUI::selectBuildTab(p0);
-
-        if (p0 == 5){
+        
+        if (p0 == 4){
             log::info("change to tab {}",p0);
             settingsUpdate();
         }

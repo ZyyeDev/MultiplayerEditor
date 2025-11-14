@@ -12,6 +12,10 @@
 using namespace geode::prelude;
 
 struct PendingAction;
+struct RemotePlayer {
+    PlayerObject* player;
+    std::string userId;
+};
 
 class SyncManager{
     private:
@@ -33,20 +37,25 @@ class SyncManager{
         uint32_t m_lastUpdateTimestamp;
 
         int m_objectCounter;
-        std::string m_userID;
+        uint32_t m_userID;
 
         bool m_applyingRemoteChanges = false;
 
         /* -- SELECTION -- */
-        std::map<std::string, std::vector<CCSprite*>> m_remoteSelectionHighlights;
-        std::map<std::string, std::vector<std::string>> m_remoteSelections;
-        std::map<std::string, CCSprite*> m_remoteCursors;
+        std::map<uint32_t, std::vector<CCSprite*>> m_remoteSelectionHighlights;
+        std::map<uint32_t, std::vector<std::string>> m_remoteSelections;
+        std::map<uint32_t, CCSprite*> m_remoteCursors;
         CCPoint m_CursorPos;
         CCArray* m_Selection;
 
         /* -- LEVEL SETTINGS -- */
         LevelSettingsData extractLevelSettings();
         void applyLevelSettings(const LevelSettingsData& settings);
+
+        /* -- PLAYER SYNC -- */
+        std::map<uint32_t, RemotePlayer> m_remotePlayers;
+        float m_lastPlayerSendTime = 0.0f;
+        
     public:
         SyncManager();
 
@@ -63,6 +72,10 @@ class SyncManager{
         // level settings
         void onLocalLevelSettingsChanged();
 
+        // player sync
+        void updatePlayerSync(float dt, LevelEditorLayer* editorLayer);
+        void sendPlayerPosition(LevelEditorLayer* editorLayer);
+
         /* --- REMOTE EVENTS --- */
         // object stuff
         void onRemoteObjectAdded(const ObjectAddPacket& packet);
@@ -70,11 +83,14 @@ class SyncManager{
         void onRemoteObjectModified(const ObjectModifyPacket& packet);
 
         // selection stuff
-        void onRemoteCursorUpdate(const std::string& userID, int x, int y);
-        void onRemoteSelectionChanged(const std::string& userID);
+        void onRemoteCursorUpdate(const uint32_t& userID, int x, int y);
+        void onRemoteSelectionChanged(const uint32_t& userID);
 
         // level settings
         void onRemoteLevelSettingsChanged(const LevelSettingsPacket& packet);
+
+        // player sync
+        void onRemotePlayerPosition(const PlayerPositionPacket& packet, LevelEditorLayer* editorLayer);
 
         /* --- FULL SYNC --- */
         void sendFullState();
@@ -87,7 +103,7 @@ class SyncManager{
         CCPoint getCursorPosition() const { return m_CursorPos; }
         CCArray* getSelection() const { return m_Selection; }
 
-        void setUserID(const std::string id) { m_userID = id; }
+        void setUserID(const uint32_t id) { m_userID = id; }
 
         bool isApplyingRemoteChanges() const { return m_applyingRemoteChanges; }
 
@@ -95,4 +111,8 @@ class SyncManager{
 
         bool isTrackedObject(GameObject* obj);
         std::string getObjectUid(GameObject* obj);
+
+        void cleanUpPlayers();
+        
+        uint32_t getUserID() { return SyncManager::m_userID; }
 };
