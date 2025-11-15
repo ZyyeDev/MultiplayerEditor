@@ -39,22 +39,24 @@ class $modify(CollabEditorPauseLayer, EditorPauseLayer){
             }
         }
 
-        auto hostSprite = ButtonSprite::create(
-            "Host Session",
-            "goldFont.fnt",
-            "GJ_button_01.png",
-            1.0f
-        );
-        //hostSprite->setScale(.7f);
+        if (!g_isInSession){
+            auto hostSprite = ButtonSprite::create(
+                "Host Session",
+                "goldFont.fnt",
+                "GJ_button_01.png",
+                1.0f
+            );
+            //hostSprite->setScale(.7f);
 
-        auto hostBtn = CCMenuItemSpriteExtra::create(
-            hostSprite,
-            this,
-            menu_selector(CollabEditorPauseLayer::onHostSession)
-        );
+            auto hostBtn = CCMenuItemSpriteExtra::create(
+                hostSprite,
+                this,
+                menu_selector(CollabEditorPauseLayer::onHostSession)
+            );
 
-        menu->addChild(hostBtn);
-        menu->updateLayout();
+            menu->addChild(hostBtn);
+            menu->updateLayout();
+        }
 
         return true;
     }
@@ -84,7 +86,11 @@ class $modify(CollabEditorPauseLayer, EditorPauseLayer){
     }
 
     void handleExit(CCObject* sender){
-        g_network->disconnect();
+        if (g_isHost){
+            g_network->stopHosting();
+        }else{
+            g_network->disconnect();
+        }
 
         g_isInSession = false;
         g_isHost = false;
