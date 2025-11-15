@@ -51,15 +51,13 @@ LevelEditorLayer* SyncManager::getEditorLayer(){
     return scene->getChildByType<LevelEditorLayer>(0);
 }
 
-// TODO: Add more properties
-ObjectData SyncManager::extractObjectData(GameObject* obj){
+ObjectData SyncManager::extractObjectData(GameObject* obj) {
     ObjectData data;
     memset(&data, 0, sizeof(data));
 
     std::string uid = getObjectUid(obj);
     strncpy(data.uid, uid.c_str(), 31);
 
-    // basic properties
     data.objectID = obj->m_objectID;
     data.x = obj->getPositionX();
     data.y = obj->getPositionY();
@@ -68,70 +66,103 @@ ObjectData SyncManager::extractObjectData(GameObject* obj){
     data.scaleY = obj->getScaleY();
     data.isFlippedX = obj->isFlipX();
     data.isFlippedY = obj->isFlipY();
+    
+    data.hasBeenActivated = obj->m_isActivated;
+    data.objectType = obj->m_objectType;
+    data.startPositionPoint = obj->m_startPosition;
+    data.useAudioScale = obj->m_usesAudioScale;
 
-    // layer stuff
     data.zLayer = obj->m_zLayer;
     data.zOrder = obj->getZOrder();
     data.editorLayer = obj->m_editorLayer;
     data.editorLayer2 = obj->m_editorLayer2;
 
-    // color properties
-    data.baseColorID = *obj->m_baseColor; // i think its this?
+    if (obj->m_baseColor) {
+        data.baseColorID = *obj->m_baseColor;
+    }
     data.detailColorID = obj->m_activeDetailColorID;
     data.dontEnter = obj->m_isDontEnter;
     data.dontFade = obj->m_isDontFade;
+    
+    data.baseUsesHSV = obj->m_baseUsesHSV;
+    data.detailUsesHSV = obj->m_detailUsesHSV;
+    if (obj->m_baseUsesHSV && obj->m_baseColor) {
+        data.hasHSV = true;
+        data.hue = obj->m_baseColor->m_hsv.h;
+        data.saturation = obj->m_baseColor->m_hsv.s;
+        data.brightness = obj->m_baseColor->m_hsv.v;
+        data.saturationChecked = obj->m_baseColor->m_hsv.absoluteSaturation;
+        data.brightnessChecked = obj->m_baseColor->m_hsv.absoluteBrightness;
+    }
 
-    // groups
-    data.groups = obj->m_groups;
+    if (obj->m_groups) {
+        data.groups = obj->m_groups;
+        int groupCount = 0;
+        for (int i = 0; i < 10; i++) {
+            if ((*obj->m_groups)[i] != 0) {
+                groupCount++;
+            }
+        }
+        data.groupCount = groupCount;
+    }
 
-    // visibility
     data.isVisible = obj->isVisible();
     data.highDetail = obj->m_isHighDetail;
+    data.editorEnabled = obj->m_editorEnabled;
 
-    // link and unique
     data.linkedGroup = obj->m_linkedGroup;
     data.uniqueID = obj->m_uniqueID;
 
-    // Text objects
     if (auto* textObj = typeinfo_cast<TextGameObject*>(obj)) {
         strncpy(data.textString, textObj->m_text.c_str(), 255);
         data.textString[255] = '\0';
     }
 
-    // Triggers - only sync properties that actually exist
     if (auto* effectObj = typeinfo_cast<EffectGameObject*>(obj)) {
         data.duration = effectObj->m_duration;
         data.targetGroupID = effectObj->m_targetGroupID;
+        data.centerGroupID = effectObj->m_centerGroupID;
         data.touchTriggered = effectObj->m_isTouchTriggered;
         data.spawnTriggered = effectObj->m_isSpawnTriggered;
         data.multiTrigger = effectObj->m_isMultiTriggered;
+        data.triggerOnExit = effectObj->m_triggerOnExit;
         
-        // Color properties
+        data.touchHoldMode = effectObj->m_touchHoldMode;
+        data.touchToggleMode = effectObj->m_touchToggleMode;
+        data.touchPlayerMode = effectObj->m_touchPlayerMode;
+        
         data.opacity = effectObj->m_opacity;
+        data.copyOpacity = effectObj->m_copyOpacity;
+        data.targetColor = effectObj->m_targetColor;
+        data.colorID = effectObj->m_activeMainColorID;
+        data.copyColorID = effectObj->m_copyColorID;
+        data.fadeTime = effectObj->m_fadeOutDuration;
+        data.fadeTime = effectObj->m_fadeInDuration;
+        data.blending = effectObj->m_usesBlending;
+        data.colorIDSecondary = effectObj->m_activeDetailColorID;
         
-        // Move trigger properties
+        data.hsvValue = effectObj->m_hsvValue;
+        
         data.moveX = effectObj->m_moveModX;
         data.moveY = effectObj->m_moveModY;
         data.easingType = effectObj->m_easingType;
         data.easingRate = effectObj->m_easingRate;
         data.lockToPlayerX = effectObj->m_lockToPlayerX;
         data.lockToPlayerY = effectObj->m_lockToPlayerY;
+        data.useMoveTarget = effectObj->m_useMoveTarget;
+        data.moveTargetMode = effectObj->m_moveTargetMode;
+        data.lockToCameraX = effectObj->m_lockToCameraX;
+        data.lockToCameraY = effectObj->m_lockToCameraY;
         
-        // Rotate trigger
+        data.dontBoostX = effectObj->m_isDontBoostX;
+        data.dontBoostY = effectObj->m_isDontBoostY;
+        
         data.degrees = effectObj->m_rotationDegrees;
         data.times360 = effectObj->m_times360;
         data.lockObjectRotation = effectObj->m_lockObjectRotation;
         
-        // Follow trigger
-        data.followXMod = effectObj->m_followXMod;
-        data.followYMod = effectObj->m_followYMod;
-        data.followYSpeed = effectObj->m_followYSpeed;
-        data.followYDelay = effectObj->m_followYDelay;
-        data.followYOffset = effectObj->m_followYOffset;
-        data.followYMaxSpeed = effectObj->m_followYMaxSpeed;
-        
-        // Pulse trigger
         data.pulseMode = effectObj->m_pulseMode;
+        data.pulseType = effectObj->m_pulseTargetType;
         data.fadeIn = effectObj->m_fadeInDuration;
         data.hold = effectObj->m_holdDuration;
         data.fadeOut = effectObj->m_fadeOutDuration;
@@ -139,53 +170,306 @@ ObjectData SyncManager::extractObjectData(GameObject* obj){
         data.detailOnly = effectObj->m_pulseDetailOnly;
         data.exclusiveMode = effectObj->m_pulseExclusive;
         
-        // Common trigger properties
-        data.centerGroupID = effectObj->m_centerGroupID;
+        data.spawnDelay = effectObj->m_spawnTriggerDelay;
+        
+        data.followXMod = effectObj->m_followXMod;
+        data.followYMod = effectObj->m_followYMod;
+        data.followYSpeed = effectObj->m_followYSpeed;
+        data.followYDelay = effectObj->m_followYDelay;
+        data.followYOffset = effectObj->m_followYOffset;
+        data.followYMaxSpeed = effectObj->m_followYMaxSpeed;
+        
         data.shakeStrength = effectObj->m_shakeStrength;
         data.shakeInterval = effectObj->m_shakeInterval;
-        data.animationID = effectObj->m_animationID;
-        data.activateGroup = effectObj->m_activateGroup;
-        data.itemID = effectObj->m_itemID;
-        data.targetColor = effectObj->m_targetColor;
         
-        // Trigger exit
-        data.triggerOnExit = effectObj->m_triggerOnExit;
+        data.animationID = effectObj->m_animationID;
+        data.animationSpeed = effectObj->m_animationSpeed;
+        data.randomizeAnimationStart = effectObj->m_animationRandomizedStart;
+        
+        data.itemID = effectObj->m_itemID;
+        data.activateGroup = effectObj->m_activateGroup;
+        data.multiActivate = effectObj->canAllowMultiActivate();
+        
+        data.teleportGravity = effectObj->m_gravityValue;
+        
+        data.randomFrameTime = effectObj->m_randomFrameTime;
+        
+        data.particleID = effectObj->m_particleString.size() > 0 ? std::stoi(effectObj->m_particleString) : 0;
+        
+        data.itemID = effectObj->m_itemID;
+        data.itemID2 = effectObj->m_itemID2;
+        
+        data.gravityValue = effectObj->m_gravityValue;
     }
+    
+    if (auto* effectObj = typeinfo_cast<EffectGameObject*>(obj)) {
+        data.isReverse = effectObj->m_isReverse;
+        
+        data.isFreeMode = effectObj->m_cameraIsFreeMode;
+        data.cameraEasing = effectObj->m_cameraEasingValue;
+        data.cameraZoom = effectObj->m_zoomValue;
+        
+        data.speedModType = effectObj->m_speedModType;
+        
+        data.hasAreaParent = effectObj->m_hasAreaParent;
+        data.areaTintOpacity = effectObj->m_areaOpacityValue;
+        
+        data.enterChannel = effectObj->m_enterChannel;
+        data.enterType = effectObj->m_enterType;
+        
+        data.usesPlayerColor1 = effectObj->m_usesPlayerColor1;
+        data.usesPlayerColor2 = effectObj->m_usesPlayerColor2;
+        
+        data.dynamicMode = effectObj->m_isDynamicMode;
+        // idk
+        //data.comparisonMode = !effectObj->m_isDynamicMode;
+    }
+    
+    if (obj->m_particle) {
+        data.hasParticles = true;
+        auto particles = obj->m_particle;
+        data.particleLifetime = particles->getLife();
+        data.particleStartSize = particles->getStartSize();
+        data.particleEndSize = particles->getEndSize();
+        data.particleStartSpin = particles->getStartSpin();
+        data.particleEndSpin = particles->getEndSpin();
+        data.particleEmissionRate = particles->getEmissionRate();
+        data.particleAngle = particles->getAngle();
+        data.particleSpeed = particles->getSpeed();
+        
+        auto posVar = particles->getPosVar();
+        data.particlePosVarX = posVar.x;
+        data.particlePosVarY = posVar.y;
+        
+        auto gravity = particles->getGravity();
+        data.particleGravityX = gravity.x;
+        data.particleGravityY = gravity.y;
+        
+        data.particleAccelRadial = particles->getRadialAccel();
+        data.particleAccelTangential = particles->getTangentialAccel();
+        
+        auto startColor = particles->getStartColor();
+        data.particleStartColorR = startColor.r * 255;
+        data.particleStartColorG = startColor.g * 255;
+        data.particleStartColorB = startColor.b * 255;
+        data.particleStartColorA = startColor.a * 255;
+        
+        auto endColor = particles->getEndColor();
+        data.particleEndColorR = endColor.r * 255;
+        data.particleEndColorG = endColor.g * 255;
+        data.particleEndColorB = endColor.b * 255;
+        data.particleEndColorA = endColor.a * 255;
+        
+        data.particleFadeInTime = particles->getLife() > 0;
+        data.particleFadeOutTime = particles->getLife() > 0;
+        data.particleStartSizeVar = particles->getStartSizeVar();
+        data.particleEndSizeVar = particles->getEndSizeVar();
+        data.particleStartSpinVar = particles->getStartSpinVar();
+        data.particleEndSpinVar = particles->getEndSpinVar();
+    }
+    
+    data.hasNoEffects = obj->m_hasNoEffects;
 
     return data;
 }
 
 void SyncManager::applyObjectData(GameObject* obj, const ObjectData& data) {
     if (!obj) return;
-
-    obj->setPositionX(data.x);
-    obj->setPositionY(data.y);
+    
+    obj->setPosition(ccp(data.x, data.y));
     obj->setRotation(data.rotation);
     obj->setScaleX(data.scaleX);
     obj->setScaleY(data.scaleY);
     obj->setFlipX(data.isFlippedX);
     obj->setFlipY(data.isFlippedY);
+    
+    obj->m_isActivated = data.hasBeenActivated;
+    obj->m_objectType = data.objectType;
+    obj->m_startPosition = data.startPositionPoint;
+    obj->m_usesAudioScale = data.useAudioScale;
+    
     obj->m_zLayer = data.zLayer;
     obj->setZOrder(data.zOrder);
     obj->m_editorLayer = data.editorLayer;
     obj->m_editorLayer2 = data.editorLayer2;
-
-    // groups
-    obj->m_groups = data.groups;
-
-    // color properties
-    *obj->m_baseColor = data.baseColorID;
+    
+    if (obj->m_baseColor) {
+        *obj->m_baseColor = data.baseColorID;
+    }
     obj->m_activeDetailColorID = data.detailColorID;
     obj->m_isDontEnter = data.dontEnter;
     obj->m_isDontFade = data.dontFade;
-
-    // visibility
+    
+    obj->m_baseUsesHSV = data.baseUsesHSV;
+    obj->m_detailUsesHSV = data.detailUsesHSV;
+    if (data.hasHSV && obj->m_baseColor) {
+        obj->m_baseColor->m_hsv.h = data.hue;
+        obj->m_baseColor->m_hsv.s = data.saturation;
+        obj->m_baseColor->m_hsv.v = data.brightness;
+        obj->m_baseColor->m_hsv.absoluteSaturation = data.saturationChecked;
+        obj->m_baseColor->m_hsv.absoluteBrightness = data.brightnessChecked;
+    }
+    
+    if (data.groupCount > 0 && data.groups) {
+        if (!obj->m_groups) {
+            obj->m_groups = new std::array<int16_t, 10>();
+        }
+        *obj->m_groups = *data.groups;
+    }
+    
     obj->setVisible(data.isVisible);
     obj->m_isHighDetail = data.highDetail;
-
-    // other
+    obj->m_editorEnabled = data.editorEnabled;
+    
     obj->m_linkedGroup = data.linkedGroup;
     obj->m_uniqueID = data.uniqueID;
+    
+    if (auto* textObj = typeinfo_cast<TextGameObject*>(obj)) {
+        textObj->m_text = std::string(data.textString);
+    }
+    
+    if (auto* effectObj = typeinfo_cast<EffectGameObject*>(obj)) {
+        effectObj->m_duration = data.duration;
+        effectObj->m_targetGroupID = data.targetGroupID;
+        effectObj->m_centerGroupID = data.centerGroupID;
+        effectObj->m_isTouchTriggered = data.touchTriggered;
+        effectObj->m_isSpawnTriggered = data.spawnTriggered;
+        effectObj->m_isMultiTriggered = data.multiTrigger;
+        effectObj->m_triggerOnExit = data.triggerOnExit;
+        
+        effectObj->m_touchHoldMode = data.touchHoldMode;
+        effectObj->m_touchToggleMode = data.touchToggleMode;
+        effectObj->m_touchPlayerMode = data.touchPlayerMode;
+        
+        effectObj->m_opacity = data.opacity;
+        effectObj->m_copyOpacity = data.copyOpacity;
+        effectObj->m_targetColor = data.targetColor;
+        effectObj->m_activeMainColorID = data.colorID;
+        effectObj->m_copyColorID = data.copyColorID;
+        effectObj->m_fadeOutDuration = data.fadeTime;
+        effectObj->m_fadeInDuration = data.fadeTime;
+        effectObj->m_usesBlending = data.blending;
+        effectObj->m_activeDetailColorID = data.colorIDSecondary;
+        
+        effectObj->m_hsvValue = data.hsvValue;
+        
+        effectObj->m_moveModX = data.moveX;
+        effectObj->m_moveModY = data.moveY;
+        effectObj->m_easingType = data.easingType;
+        effectObj->m_easingRate = data.easingRate;
+        effectObj->m_lockToPlayerX = data.lockToPlayerX;
+        effectObj->m_lockToPlayerY = data.lockToPlayerY;
+        effectObj->m_useMoveTarget = data.useMoveTarget;
+        effectObj->m_moveTargetMode = data.moveTargetMode;
+        effectObj->m_lockToCameraX = data.lockToCameraX;
+        effectObj->m_lockToCameraY = data.lockToCameraY;
+        
+        effectObj->m_isDontBoostX = data.dontBoostX;
+        effectObj->m_isDontBoostY = data.dontBoostY;
+        
+        effectObj->m_rotationDegrees = data.degrees;
+        effectObj->m_times360 = data.times360;
+        effectObj->m_lockObjectRotation = data.lockObjectRotation;
+        
+        effectObj->m_pulseMode = data.pulseMode;
+        effectObj->m_pulseTargetType = data.pulseType;
+        effectObj->m_fadeInDuration = data.fadeIn;
+        effectObj->m_holdDuration = data.hold;
+        effectObj->m_fadeOutDuration = data.fadeOut;
+        effectObj->m_pulseMainOnly = data.mainOnly;
+        effectObj->m_pulseDetailOnly = data.detailOnly;
+        effectObj->m_pulseExclusive = data.exclusiveMode;
+        
+        effectObj->m_spawnTriggerDelay = data.spawnDelay;
+        
+        effectObj->m_followXMod = data.followXMod;
+        effectObj->m_followYMod = data.followYMod;
+        effectObj->m_followYSpeed = data.followYSpeed;
+        effectObj->m_followYDelay = data.followYDelay;
+        effectObj->m_followYOffset = data.followYOffset;
+        effectObj->m_followYMaxSpeed = data.followYMaxSpeed;
+        
+        effectObj->m_shakeStrength = data.shakeStrength;
+        effectObj->m_shakeInterval = data.shakeInterval;
+        
+        effectObj->m_animationID = data.animationID;
+        effectObj->m_animationSpeed = data.animationSpeed;
+        effectObj->m_animationRandomizedStart = data.randomizeAnimationStart;
+        
+        effectObj->m_itemID = data.itemID;
+        effectObj->m_activateGroup = data.activateGroup;
+        
+        effectObj->m_gravityValue = data.teleportGravity;
+        
+        effectObj->m_randomFrameTime = data.randomFrameTime;
+        
+        if (data.particleID > 0) {
+            effectObj->m_particleString = std::to_string(data.particleID);
+        }
+        
+        effectObj->m_itemID = data.itemID;
+        effectObj->m_itemID2 = data.itemID2;
+        
+        effectObj->m_gravityValue = data.gravityValue;
+        
+        effectObj->m_isReverse = data.isReverse;
+        
+        effectObj->m_cameraIsFreeMode = data.isFreeMode;
+        effectObj->m_cameraEasingValue = data.cameraEasing;
+        effectObj->m_zoomValue = data.cameraZoom;
+        
+        effectObj->m_speedModType = data.speedModType;
+        
+        effectObj->m_hasAreaParent = data.hasAreaParent;
+        effectObj->m_areaOpacityValue = data.areaTintOpacity;
+        
+        effectObj->m_enterChannel = data.enterChannel;
+        effectObj->m_enterType = data.enterType;
+        
+        effectObj->m_usesPlayerColor1 = data.usesPlayerColor1;
+        effectObj->m_usesPlayerColor2 = data.usesPlayerColor2;
+        
+        effectObj->m_isDynamicMode = data.dynamicMode;
+    }
+    
+    if (data.hasParticles && obj->m_particle) {
+        auto particles = obj->m_particle;
+        particles->setLife(data.particleLifetime);
+        particles->setStartSize(data.particleStartSize);
+        particles->setEndSize(data.particleEndSize);
+        particles->setStartSpin(data.particleStartSpin);
+        particles->setEndSpin(data.particleEndSpin);
+        particles->setEmissionRate(data.particleEmissionRate);
+        particles->setAngle(data.particleAngle);
+        particles->setSpeed(data.particleSpeed);
+        
+        particles->setPosVar(ccp(data.particlePosVarX, data.particlePosVarY));
+        particles->setGravity(ccp(data.particleGravityX, data.particleGravityY));
+        
+        particles->setRadialAccel(data.particleAccelRadial);
+        particles->setTangentialAccel(data.particleAccelTangential);
+        
+        ccColor4F startColor;
+        startColor.r = data.particleStartColorR / 255.0f;
+        startColor.g = data.particleStartColorG / 255.0f;
+        startColor.b = data.particleStartColorB / 255.0f;
+        startColor.a = data.particleStartColorA / 255.0f;
+        particles->setStartColor(startColor);
+        
+        ccColor4F endColor;
+        endColor.r = data.particleEndColorR / 255.0f;
+        endColor.g = data.particleEndColorG / 255.0f;
+        endColor.b = data.particleEndColorB / 255.0f;
+        endColor.a = data.particleEndColorA / 255.0f;
+        particles->setEndColor(endColor);
+        
+        particles->setStartSizeVar(data.particleStartSizeVar);
+        particles->setEndSizeVar(data.particleEndSizeVar);
+        particles->setStartSpinVar(data.particleStartSpinVar);
+        particles->setEndSpinVar(data.particleEndSpinVar);
+    }
+    
+    obj->m_hasNoEffects = data.hasNoEffects;
 }
 
 GameObject* SyncManager::createObjectFromData(const ObjectData& data){

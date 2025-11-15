@@ -35,6 +35,14 @@ struct ObjectData {
     float x, y;
     float rotation;
     float scaleX, scaleY;
+    bool isFlippedX;
+    bool isFlippedY;
+    
+    // Object state
+    bool hasBeenActivated;
+    GameObjectType objectType;
+    cocos2d::CCPoint startPositionPoint;
+    bool useAudioScale;
     
     // Layer properties
     ZLayer zLayer;
@@ -43,45 +51,84 @@ struct ObjectData {
     int editorLayer2;
     
     // Color properties
-    GJSpriteColor baseColorID;           // Base color channel
-    int detailColorID;         // Detail color channel
-    bool dontEnter;            // Don't enter effect
-    bool dontFade;             // Don't fade effect
+    GJSpriteColor baseColorID;
+    int detailColorID;
+    bool dontEnter;
+    bool dontFade;
+    
+    // HSV properties
+    bool baseUsesHSV;
+    bool detailUsesHSV;
+    bool hasHSV;
+    float hue;
+    float saturation;
+    float brightness;
+    bool saturationChecked;
+    bool brightnessChecked;
     
     // Group properties
-    std::array<int16_t, 10Ui64> *groups;         // Group IDs
+    std::array<int16_t, 10> *groups;
+    int groupCount;
     
-    // Trigger properties (for triggers)
+    // Visibility & Detail
+    bool isVisible;
+    bool highDetail;
+    bool editorEnabled;
+    
+    // Link and unique
+    int linkedGroup;
+    int uniqueID;
+    
+    // Text objects
+    char textString[256];
+    
+    // Trigger properties (common to all triggers)
     float duration;
     int targetGroupID;
     int centerGroupID;
     bool touchTriggered;
     bool spawnTriggered;
     bool multiTrigger;
+    bool triggerOnExit;
     
-    // Color trigger specific
-    float fadeTime;
-    int colorID;
-    int targetColor;
-    float red, green, blue;
+    // Touch trigger
+    bool touchHoldMode;
+    TouchTriggerType touchToggleMode;
+    TouchTriggerControl touchPlayerMode;
+    
+    // Color trigger
     float opacity;
+    bool copyOpacity;
+    int targetColor;
+    int colorID;
+    int copyColorID;
+    float fadeTime;
     bool blending;
     int colorIDSecondary;
     
-    // Move trigger specific
+    // HSV trigger
+    cocos2d::ccHSVValue hsvValue;
+    
+    // Move trigger
     float moveX, moveY;
     EasingType easingType;
     float easingRate;
     bool lockToPlayerX;
     bool lockToPlayerY;
-    int targetMode;
+    bool useMoveTarget;
+    MoveTargetType moveTargetMode;
+    bool lockToCameraX;
+    bool lockToCameraY;
     
-    // Rotate trigger specific
+    bool dontBoostX;
+    bool dontBoostY;
+    
+    // Rotate trigger
     float degrees;
     int times360;
     bool lockObjectRotation;
     
-    // Pulse trigger specific
+    // Pulse trigger
     int pulseMode;
     int pulseType;
     float fadeIn;
@@ -91,27 +138,29 @@ struct ObjectData {
     bool detailOnly;
     bool exclusiveMode;
     
-    // Spawn trigger specific
-    float delayTime;
+    // Spawn trigger
+    float spawnDelay;
     
-    // Follow trigger specific
+    // Follow trigger
     float followXMod;
     float followYMod;
+    int followYSpeed;
+    int followYDelay;
+    int followYOffset;
+    float followYMaxSpeed;
     
-    // Shake trigger specific
+    // Shake trigger
     float shakeStrength;
     float shakeInterval;
     
-    // Animate trigger specific
+    // Animate trigger
     int animationID;
+    float animationSpeed;
+    bool randomizeAnimationStart;
     
-    // Touch trigger specific
-    bool holdMode;
-    int toggleMode;
-    
-    // Count trigger specific
+    // Count trigger
     int itemID;
-    int targetCount;
+    int itemID2;
     bool activateGroup;
     bool multiActivate;
     
@@ -125,208 +174,61 @@ struct ObjectData {
     bool activateOnExit;
     int blockAID;
     int blockBID;
-    
-    // Alpha trigger
-    float targetOpacity;
-    
-    // Toggle trigger
-    
-    // Stop trigger
+    bool isDynamic;
+    int blockID;
     
     // Teleport trigger
     float teleportGravity;
-    
-    // Random trigger
-    int groupIDRandom1;
-    int groupIDRandom2;
-    int chances;
+
+    float randomFrameTime;
     
     // Advanced Random trigger
     std::array<int16_t, 10> advancedRandomGroups;
     std::array<int16_t, 10> advancedRandomChances;
     
-    // Sequence trigger
-    int sequenceCount;
-    int minInt;
-    int maxInt;
-    
     // Spawn particle trigger
     int particleID;
     
-    // Time trigger
-    int timeMode;
-    
-    // Event trigger
-    int eventID;
-    
-    // Item edit trigger
-    int itemEditMode;
-    int itemAmount;
-    
-    // Gradient properties
-    bool useGradient;
-    int gradientID;
-    
-    // HSV properties
-    bool hasHSV;
-    float hue;
-    float saturation;
-    float brightness;
-    bool saturationChecked;
-    bool brightnessChecked;
-    
-    // Portal properties (for portals)
-    bool portalChecked;
-    
-    // Orb properties (for orbs)
-    bool multiActivate_orb;
-    
-    // Pad properties (for pads)
-    
-    // Text properties (for text objects)
-    char textString[256];
-    
-    // Item counter properties
-    
     // Reverse trigger
-    bool reverseSync;
-    
-    // Rotate gameplay trigger
-    int rotateMode;
-    
-    // Song trigger
-    int songID;
+    bool isReverse;
+    bool reverseEnabled;
     
     // SFX trigger
-    int sfxID;
+    /*
+    int sfxSound;
     float volume;
     float pitch;
     bool sfxPreload;
-    int sfxGroup;
-    bool stopSFX;
-    
-    // Edit SFX trigger
-    int sfxEditMode;
-    
-    // Camera mode trigger
-    int cameraMode;
-    
-    // Camera offset trigger
-    float cameraOffsetX;
-    float cameraOffsetY;
-    
-    // Camera rotate trigger
-    float cameraRotation;
-    int cameraEasing;
-    
-    // Camera edge trigger
-    float cameraEdge;
-    int cameraEdgeTarget;
-    
-    // Static camera trigger
-    
-    // Camera zoom trigger
+    */
+
+    // Camera triggers
+    bool isFreeMode;
+    float cameraEasing;
     float cameraZoom;
     
-    // Speed change properties (for speed changes)
-    float speedMod;
+    // Speed
+    short speedModType;
     
-    // Visibility properties
-    bool isVisible;
-    bool editorVisibleOnly;
+    // Area trigger
+    bool hasAreaParent;
+    int areaParentID;
+    //int areaTintID;
+    float areaTintOpacity;
     
-    // Link properties
-    int linkedGroup;
-    
-    // High detail
-    bool highDetail;
-    
-    // Custom object properties (for custom objects like items)
-    bool isReferenceOnly;
-    
-    // Scale properties
-    bool scaleControlled;
-    
-    // Unique ID for special objects
-    int uniqueID;
-    
-    // Audio properties
-    int audioTrack;
-    
-    // Area trigger properties
-    bool replaceAudioTrack;
-    
-    // Edit area properties
-    int areaID;
-    
-    // Keyframe properties
-    int keyframeID;
-    float keyframeTime;
-    int keyframeEasing;
-    
-    // Advanced follow properties
-    int followYSpeed;
-    int followYDelay;
-    int followYOffset;
-    float followYMaxSpeed;
-    
-    // Gradient layer
-    int gradientLayer;
-    
-    // Enter channel properties
+    // Enter channel
     int enterChannel;
+    short enterType;
     
-    // Player color properties (for player color triggers)
-    int playerColorID;
-    
-    // BG/Ground properties
-    bool isBG;
-    bool isGround;
-    bool isMG;
-    
-    // 2.2 specific properties
-    bool dontBoost;
-    bool dontBoostX;
-    bool dontBoostY;
-    int targetPosMode;
-    int targetPosID;
-    float targetPosXMod;
-    float targetPosYMod;
-    int targetPosEasing;
+    // Player color
+    int usesPlayerColor1;
+    int usesPlayerColor2;
     
     // Advanced trigger properties
     bool dynamicMode;
     int comparisonMode;
     
-    // Gradient trigger properties
-    bool blendingEnabled;
-    int gradientMode;
-    
-    // Shader properties (2.2)
-    int shaderID;
-    float shaderValue1;
-    float shaderValue2;
-    float shaderValue3;
-    
-    // Area properties
-    bool isAreaParent;
-    bool isAreaChild;
-    int areaParentID;
-    
-    // Persistent properties
-    bool isPersistent;
-    
-    // Random seed
-    int randomSeed;
-    
-    // Collision block properties
-    bool isDynamic;
-    int blockID;
-    
-    // Advanced item edit
-    float itemEditValue;
-    
     // Particle system properties
+    bool hasParticles;
     float particleLifetime;
     float particleStartSize;
     float particleEndSize;
@@ -356,64 +258,11 @@ struct ObjectData {
     bool particleStartSpinVar;
     bool particleEndSpinVar;
     
-    // Platformer mode properties (2.2)
-    bool isPlatformer;
-    float platformerSpeed;
-    
-    // Reverse gameplay
-    bool reverseEnabled;
-    
-    // Extra object properties
-    bool isFlippedX;
-    bool isFlippedY;
-    
-    // Custom enter effect
-    int enterEffect;
-    float enterEffectDuration;
-    
-    // Animation speed
-    float animationSpeed;
-    bool randomizeAnimationStart;
-    
-    // Sequence trigger randomization
-    bool sequenceRandomize;
-    
-    // Reset trigger
-    bool resetRemap;
-    
-    // Time warp properties
-    float timeWarpSpeed;
-    
-    // Area tint
-    int areaTintID;
-    float areaTintOpacity;
-    
-    // Checkpoint
-    bool isCheckpoint;
-    
-    // Song offset trigger
-    float songOffset;
-    
-    // Gamemode portal properties
-    int gamemodePortalType;
-    
     // Player items
     bool hasNoEffects;
-    
-    // Special properties for optimization
-    int customObjectID;
-    bool isUnique;
-    
-    // 2.2 platformer properties
-    bool stopJump;
-    float jumpHeight;
-    
-    // More trigger properties
-    bool triggerOnExit;
-    int activateDelay;
-    
-    // Follow dampening
-    float followDamping;
+
+    // Gravity
+    float gravityValue;
 };
 
 struct ObjectAddPacket{
