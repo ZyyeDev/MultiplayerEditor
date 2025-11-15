@@ -13,6 +13,8 @@ class NetworkManager{
         NetworkManager();
         ~NetworkManager();
 
+        uint16_t m_port;
+
         // TODO: for now port will ALWAYS be 7777, however in the future you should be able to change it
         bool host(uint16_t port = 7777);
         bool stopHosting();

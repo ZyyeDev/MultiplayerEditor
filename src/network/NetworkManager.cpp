@@ -19,6 +19,7 @@ bool NetworkManager::host(uint16_t port){
         log::error("Failed to create enet host");
         return false;
     }
+    m_port = port;
     m_isHost = true;
     log::info("Hosting on port {}", port);
     return true;
@@ -56,6 +57,7 @@ bool NetworkManager::connect(const std::string& ip, uint16_t port){
     ENetEvent event;
     if (enet_host_service(m_host, &event, 5000) > 0 && event.type == ENET_EVENT_TYPE_CONNECT){
         log::info("connected to {}:{}!",ip,port);
+        m_port = port;
         m_isHost = false;
         if (m_onConnect) m_onConnect();
         return true;

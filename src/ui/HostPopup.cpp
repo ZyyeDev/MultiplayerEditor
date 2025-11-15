@@ -40,6 +40,10 @@ bool HostPopup::setup(){
         winSize.height/2 + 60
     ));
     this->m_mainLayer->addChild(m_ipLabel);
+    
+    if (g_isHost && g_isInSession){
+        m_ipLabel->setString(std::format("127.0.0.1:{}", g_network->m_port).c_str());
+    }
 
     // host button
     hostBtn = CCMenuItemSpriteExtra::create(
@@ -51,9 +55,8 @@ bool HostPopup::setup(){
         winSize.width/2,
         winSize.height/2+30
     ));
-
     if (g_isHost && g_isInSession){
-        m_ipLabel->setString("127.0.0.1:7777");
+        hostBtn->setSprite(ButtonSprite::create("Stop Hosting", "goldFont.fnt", "GJ_button_01.png", .8f));
     }
 
     // popup menu
@@ -66,8 +69,20 @@ bool HostPopup::setup(){
 }
 
 void HostPopup::onStartHost(CCObject*){
+    if (g_isHost && g_isInSession){
+        g_network->stopHosting();
+        FLAlertLayer::create(
+            "Stopped Hosting!",
+            "You are no longer hosting!",
+            "OK"
+        )->show();
+    }
+
     // TODO: The user should be able to chose the port they are hosting
     if (g_network->host(7777)){
+        if (hostBtn){
+            hostBtn->setSprite(ButtonSprite::create("Stop Hosting", "goldFont.fnt", "GJ_button_01.png", .8f));
+        }
         g_isHost = true;
         g_isInSession = true;
 
@@ -80,13 +95,6 @@ void HostPopup::onStartHost(CCObject*){
         g_sync->trackExistingObjects();
         
         log::info("it works!!! :3");
-        
-        // TODO
-        /*if (hostBtn){
-            hostBtn->setSprite(
-                ButtonSprite::create("Stop Hosting", "goldFont.fnt", "GJ_button_01.png", .8f)
-            );
-        }*/
 
         FLAlertLayer::create(
             "Hosting!",
@@ -103,8 +111,8 @@ void HostPopup::onStartHost(CCObject*){
                 // i dont think this can happen, but just in case. No one knows.
                 FLAlertLayer::create(
                     "ERROR",
-                    "Couldn't send full state: g_sync is null! Please report.",
-                    "OK"
+                    "Couldn't sendfull state: g_sync is null! Please report.",
+                    "OK" 
                 )->show();
             }
         });
