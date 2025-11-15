@@ -806,11 +806,11 @@ void SyncManager::onRemoteSelectionChanged(const uint32_t& userID){
     if (m_remoteSelectionHighlights.empty()){
         return;
     }
-    if (m_remoteSelectionHighlights.contains(userID)){
+    if (!m_remoteSelectionHighlights.contains(userID)){
         log::warn("m_remoteSelectionHighlights does not contain {}", userID);
         return;
     }
-    if (m_remoteSelections.contains(userID)){
+    if (!m_remoteSelections.contains(userID)){
         log::warn("m_remoteSelections does not contain {}", userID);
         return;
     }
@@ -864,6 +864,7 @@ LevelSettingsData SyncManager::extractLevelSettings(){
     memset(&data, 0, sizeof(data));
 
     auto editor = getEditorLayer();
+    
     if (!editor) {
         log::error("cant get editor layer!!");
         return data;
