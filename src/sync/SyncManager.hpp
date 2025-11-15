@@ -73,8 +73,8 @@ class SyncManager{
         void onLocalLevelSettingsChanged();
 
         // player sync
-        void updatePlayerSync(float dt, LevelEditorLayer* editorLayer);
-        void sendPlayerPosition(LevelEditorLayer* editorLayer);
+        void updatePlayerSync(float dt, LevelEditorLayer* editorLayer, bool stopPlaytest);
+        void sendPlayerPosition(LevelEditorLayer* editorLayer, bool stopPlaytest);
 
         /* --- REMOTE EVENTS --- */
         // object stuff

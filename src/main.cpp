@@ -19,6 +19,8 @@ int port = 7777; // this isnt used at all, must be implemented in the future!!
 bool g_isHost = false;
 bool g_isInSession = false;
 
+bool wasPlaytesting = false;
+
 CCPoint lastMousePos = ccp(0,0);
 
 $on_mod(Loaded){
@@ -53,7 +55,11 @@ class $modify(CCScheduler) {
             auto editorLayer = LevelEditorLayer::get();
             if (editorLayer && editorLayer->m_objectLayer){
                 if (g_isInSession && g_sync && editorLayer->m_playbackMode == PlaybackMode::Playing) {
-                    g_sync->updatePlayerSync(dt, editorLayer);
+                    wasPlaytesting = true;
+                    g_sync->updatePlayerSync(dt, editorLayer, false);
+                }else if (wasPlaytesting){
+                    wasPlaytesting = false;
+                    g_sync->sendPlayerPosition(editorLayer, true);
                 }
             }
         }

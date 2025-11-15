@@ -63,6 +63,7 @@ class $modify(MyLevelEditorLayer, LevelEditorLayer){
 
     void onStopPlaytest() {
         log::info("stop playtest");
+
         
         m_fields->m_playtesting = false;
         if (g_sync) {

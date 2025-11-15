@@ -803,25 +803,20 @@ void SyncManager::onLocalSelectionChanged(CCArray* selectedObjects){
 }
 
 void SyncManager::onRemoteSelectionChanged(const uint32_t& userID){
-    if (m_remoteSelectionHighlights.empty()){
-        return;
-    }
-    if (!m_remoteSelectionHighlights.contains(userID)){
-        log::warn("m_remoteSelectionHighlights does not contain {}", userID);
-        return;
-    }
     if (!m_remoteSelections.contains(userID)){
-        log::warn("m_remoteSelections does not contain {}", userID);
         return;
     }
+    
     // remove old highlights
-    auto& highlights = m_remoteSelectionHighlights[userID];
-    for (auto sprite : highlights){
-        if (sprite){
-            sprite->removeFromParent();
+    if (m_remoteSelectionHighlights.contains(userID)) {
+        auto& highlights = m_remoteSelectionHighlights[userID];
+        for (auto sprite : highlights){
+            if (sprite){
+                sprite->removeFromParent();
+            }
         }
+        highlights.clear();
     }
-    highlights.clear();
 
     auto editor = getEditorLayer();
     if (!editor) return;
@@ -835,14 +830,11 @@ void SyncManager::onRemoteSelectionChanged(const uint32_t& userID){
 
         GameObject* obj = it->second;
 
-        auto highlight = CCSprite::create("square02_001.png");
+        auto highlight = CCSprite::createWithSpriteFrameName("whiteSquare60_001.png");
         if (!highlight){
-            log::error("highlight does not exist??");
             continue;
         }
 
-        // each user should have its own color
-        // for now remote selections will be cyan
         highlight->setColor({0, 255, 255});
         highlight->setOpacity(128);
 
@@ -852,7 +844,7 @@ void SyncManager::onRemoteSelectionChanged(const uint32_t& userID){
         
         highlight->setPosition(obj->getPosition());
         highlight->setRotation(obj->getRotation());
-        highlight->setZOrder(obj->getZOrder() + 1);
+        highlight->setZOrder(obj->getZOrder() - 1);
         
         editor->m_objectLayer->addChild(highlight);
         m_remoteSelectionHighlights[userID].push_back(highlight);
@@ -1016,7 +1008,7 @@ void SyncManager::trackExistingObjects(){
     }
 }
 
-void SyncManager::updatePlayerSync(float dt, LevelEditorLayer* editorLayer){
+void SyncManager::updatePlayerSync(float dt, LevelEditorLayer* editorLayer, bool stopPlaytest){
     if (!editorLayer) return;
     
     auto plr = editorLayer->m_player1;
@@ -1029,7 +1021,7 @@ void SyncManager::updatePlayerSync(float dt, LevelEditorLayer* editorLayer){
 
     if (m_lastPlayerSendTime >= 0.05f){
         m_lastPlayerSendTime = 0.0f;
-        sendPlayerPosition(editorLayer);
+        sendPlayerPosition(editorLayer, stopPlaytest);
     }
     
     for (auto& [userId, remotePlr] : m_remotePlayers){
@@ -1039,7 +1031,7 @@ void SyncManager::updatePlayerSync(float dt, LevelEditorLayer* editorLayer){
     }
 }
 
-void SyncManager::sendPlayerPosition(LevelEditorLayer* editorLayer){
+void SyncManager::sendPlayerPosition(LevelEditorLayer* editorLayer, bool stopPlaytest){
     if (!editorLayer) return;
     
     auto plr = editorLayer->m_player1;
@@ -1061,6 +1053,7 @@ void SyncManager::sendPlayerPosition(LevelEditorLayer* editorLayer){
     packet.rotation = plr->getRotation();
     packet.isUpsideDown = plr->m_isUpsideDown;
     packet.isDead = plr->m_isDead;
+    packet.stopPlaytest = stopPlaytest;
 
     packet.iconData.iconID = gameManager->getPlayerFrame();
     packet.iconData.shipID = gameManager->getPlayerShip();
@@ -1086,6 +1079,18 @@ void SyncManager::onRemotePlayerPosition(const PlayerPositionPacket& packet, Lev
     uint32_t userId = packet.header.senderID;
 
     auto it = m_remotePlayers.find(userId);
+    
+    bool stopPlaytest = packet.stopPlaytest;
+
+    if (stopPlaytest){
+        if (it != m_remotePlayers.end()){
+            auto remotePlayer = it->second.player;
+            if (remotePlayer){
+                remotePlayer->setVisible(false);
+                remotePlayer->destroyObject();
+            }
+        }
+    }
 
     if (it == m_remotePlayers.end()) {
         auto remotePlayer = PlayerObject::create(

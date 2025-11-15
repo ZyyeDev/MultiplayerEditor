@@ -282,7 +282,7 @@ struct ObjectModifyPacket{
     ObjectData object;
 };
 
-struct FullSyncPacket {
+struct FullSyncPacket{
     PacketHeader header;
     uint32_t objectCount;
     // TODO: Send complete level, with all objects
@@ -349,13 +349,14 @@ struct PlayerIconData{
     bool hasGlow;
 };
 
-struct PlayerPositionPacket {
+struct PlayerPositionPacket{
     PacketHeader header;
     float x;
     float y;
     float rotation;
     bool isUpsideDown;
     bool isDead;
+    bool stopPlaytest;
     PlayerIconData iconData;
 };
 
