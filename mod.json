@@ -6,14 +6,20 @@
 		"mac": "2.2074",
 		"ios": "2.2074"
 	},
-	"id": "test.multiplayereditor",
-	"name": "MultiplayerEditor",
+	"id": "zyyedev.multiplayereditor",
+	"name": "Multiplayer Editor",
 	"version": "v0.0.1-alpha",
-	"developer": "",
-	"description": "",
+	"developer": "ZyyeDev",
+	"description": "Mutliplayer Collab Editor",
     "resources": {	
         "sprites": [
             "resources/*.png"
         ]
-    }
+    },
+	"dependencies": {
+		"geode.node-ids": {
+            "version": ">=1.11.0",
+            "importance": "required"
+        }
+	}
 }
