@@ -28,6 +28,16 @@ class $modify(MyLevelEditorLayer, LevelEditorLayer){
     };
 
     /* -- add obj -- */
+    void addKeyframe(KeyframeGameObject* p0) {
+        // todo
+        LevelEditorLayer::addKeyframe(p0);
+    }
+
+    void addDelayedSpawn(EffectGameObject* p0, float p1) {
+        // todo
+        LevelEditorLayer::addDelayedSpawn(p0, p1);
+    }
+
     void addSpecial(GameObject* p0) {
         LevelEditorLayer::addSpecial(p0);
 
@@ -64,7 +74,6 @@ class $modify(MyLevelEditorLayer, LevelEditorLayer){
     void onStopPlaytest() {
         log::info("stop playtest");
 
-        
         m_fields->m_playtesting = false;
         if (g_sync) {
             g_sync->cleanUpPlayers();
