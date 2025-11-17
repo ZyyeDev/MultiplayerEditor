@@ -668,7 +668,6 @@ void SyncManager::handlePacket(const uint8_t* data, size_t size) {
             
             auto editorLayer = getEditorLayer();
             if (editorLayer){
-                log::info("remote plr pos");
                 onRemotePlayerPosition(*packet, editorLayer);
             }else{
                 log::error("editor layer does not exist!");
@@ -846,7 +845,7 @@ void SyncManager::onRemoteSelectionChanged(const uint32_t& userID){
         highlight->setRotation(obj->getRotation());
         highlight->setZOrder(obj->getZOrder() - 1);
         
-        editor->m_objectLayer->addChild(highlight);
+        obj->addChild(highlight);
         m_remoteSelectionHighlights[userID].push_back(highlight);
     }
 }
