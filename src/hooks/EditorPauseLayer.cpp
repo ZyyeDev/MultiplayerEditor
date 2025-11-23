@@ -56,6 +56,23 @@ class $modify(CollabEditorPauseLayer, EditorPauseLayer){
 
             menu->addChild(hostBtn);
             menu->updateLayout();
+        }else if (g_isHost){
+            auto hostSprite = ButtonSprite::create(
+                "Stop Hosting",
+                "goldFont.fnt",
+                "GJ_button_01.png",
+                1.0f
+            );
+            //hostSprite->setScale(.7f);
+
+            auto hostBtn = CCMenuItemSpriteExtra::create(
+                hostSprite,
+                this,
+                menu_selector(CollabEditorPauseLayer::onHostSession)
+            );
+
+            menu->addChild(hostBtn);
+            menu->updateLayout();
         }
 
         return true;
