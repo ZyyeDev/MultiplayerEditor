@@ -76,6 +76,7 @@ void HostPopup::onStartHost(CCObject*){
             "You are no longer hosting!",
             "OK"
         )->show();
+        return;
     }
 
     // TODO: The user should be able to chose the port they are hosting
