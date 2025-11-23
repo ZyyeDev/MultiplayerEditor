@@ -54,7 +54,7 @@ bool NetworkManager::connect(const std::string& ip, uint16_t port){
     
     m_peer = enet_host_connect(m_host, &address, 2, 0);
     if (m_peer == nullptr){
-        log::error("couldnt connect to host!");
+        log::error("Couldn't connect to host!");
         enet_host_destroy(m_host);
         m_host = nullptr;
         return false;
