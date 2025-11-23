@@ -2,10 +2,8 @@
 
 A multiplayer Geometry Dash mod for building levels with others, made using [enet](https://github.com/lsalzman/enet).
 
-# ⚠ WARNING: THIS MOD IS IN VERY EARLY STAGES OF DEVELOPING!!!
-Please expect bugs. **Always back up your levels before using it!**
-
-Also, keep in mind that not many object or level properties sync yet. Geode bindings doesn't have all of them at the moment (or maybe I just haven't found them). I'm trying to work on a solution for this!
+⚠️ **Development Status**: This mod is functional but incomplete. 
+I'm releasing it publicly in hopes that someone might want to contribute, and **I'm not actively developing it anymore**. Not all object properties sync yet because I can't find them anywhere.
 
 ## Installation
 
