@@ -7,6 +7,8 @@
 #include <ctime>
 #include <Geode/Geode.hpp>
 
+const int maxPlayers = 128;
+
 enum class PacketType : uint8_t {
     HANDSHAKE = 0,
     FULL_SYNC = 1,
@@ -17,6 +19,9 @@ enum class PacketType : uint8_t {
     SELECT_CHANGE = 6,
     LEVEL_SETTINGS = 7,
     PLAYER_POSITION = 8,
+    PEER_JOINED = 9,
+    PEER_LEFT = 10,
+    LOBBY_SYNC = 11,
 };
 
 #pragma pack(push, 1)
@@ -25,6 +30,11 @@ struct PacketHeader{
     PacketType type;
     uint32_t timestamp;
     uint32_t senderID;
+};
+
+struct HandshakePacket{
+    PacketHeader header;
+    gd::string username;
 };
 
 struct ObjectData {
@@ -67,7 +77,7 @@ struct ObjectData {
     bool brightnessChecked;
     
     // Group properties
-    std::array<int16_t, 10> *groups;
+    std::array<int16_t, 10> groups;
     int groupCount;
     
     // Visibility & Detail
@@ -367,6 +377,28 @@ struct SelectPacket{
     uint32_t totalCount;
     uint32_t countInChunk;
     char uids[50][32];
+};
+
+struct PeerJoinedPacket{
+    PacketHeader header;
+    uint32_t peerID;
+    char username[64];
+};
+
+struct PeerLeftPacket{
+    PacketHeader header;
+    uint32_t peerID;
+};
+
+struct LobbyMember{
+    uint32_t peerID;
+    char username[64];
+};
+
+struct LobbySyncPacket{
+    PacketHeader header;
+    uint32_t memberCount;
+    LobbyMember members[maxPlayers];
 };
 
 #pragma pack(pop)

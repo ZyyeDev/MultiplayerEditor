@@ -57,6 +57,7 @@ ObjectData SyncManager::extractObjectData(GameObject* obj) {
 
     std::string uid = getObjectUid(obj);
     strncpy(data.uid, uid.c_str(), 31);
+    data.uid[31] = '\0';
 
     data.objectID = obj->m_objectID;
     data.x = obj->getPositionX();
@@ -96,7 +97,7 @@ ObjectData SyncManager::extractObjectData(GameObject* obj) {
     }
 
     if (obj->m_groups) {
-        data.groups = obj->m_groups;
+        data.groups = *obj->m_groups;
         int groupCount = 0;
         for (int i = 0; i < 10; i++) {
             if ((*obj->m_groups)[i] != 0) {
@@ -104,6 +105,8 @@ ObjectData SyncManager::extractObjectData(GameObject* obj) {
             }
         }
         data.groupCount = groupCount;
+    }else{
+        data.groups = {};
     }
 
     data.isVisible = obj->isVisible();
@@ -310,11 +313,11 @@ void SyncManager::applyObjectData(GameObject* obj, const ObjectData& data) {
         obj->m_baseColor->m_hsv.absoluteBrightness = data.brightnessChecked;
     }
     
-    if (data.groupCount > 0 && data.groups) {
+    if (data.groupCount > 0) {
         if (!obj->m_groups) {
             obj->m_groups = new std::array<int16_t, 10>();
         }
-        *obj->m_groups = *data.groups;
+        *obj->m_groups = data.groups;
     }
     
     obj->setVisible(data.isVisible);
@@ -614,6 +617,42 @@ void SyncManager::handlePacket(const uint8_t* data, size_t size) {
     const PacketHeader* header = reinterpret_cast<const PacketHeader*>(data);
     
     switch (header->type) {
+        case PacketType::HANDSHAKE: {
+            const HandshakePacket* packet = reinterpret_cast<const HandshakePacket*>(data);
+            g_network->addPeer(packet->header.senderID, packet->username);
+            if (g_isHost){
+                g_network->sendLobbyState(packet->header.senderID);
+                g_network->broadcastPeerJoined(packet->header.senderID, packet->username);
+            }
+            break;
+        }
+        case PacketType::PEER_JOINED: {
+            const PeerJoinedPacket* packet = reinterpret_cast<const PeerJoinedPacket*>(data);
+            g_network->addPeer(packet->peerID, packet->username);
+            log::info("peer joined {} ({})", packet->peerID, packet->username);
+            break;
+        }
+        case PacketType::PEER_LEFT: {
+            const PeerJoinedPacket* packet = reinterpret_cast<const PeerJoinedPacket*>(data);
+            g_network->removePeer(packet->peerID);
+            log::info("peer left {}", packet->peerID);
+            break;
+        }
+        case PacketType::LOBBY_SYNC: {
+            const LobbySyncPacket* packet = reinterpret_cast<const LobbySyncPacket*>(data);
+
+            g_network->m_peersInLobby.clear();
+
+            for (uint32_t i = 0; i < packet->memberCount; i++){
+                g_network->addPeer(
+                    packet->members[i].peerID,
+                    packet->members[i].username
+                );
+            }
+
+            log::info("lobby synced: {} members", packet->memberCount);
+            break;
+        }
         case PacketType::OBJECT_ADD: {
             const ObjectAddPacket* packet = reinterpret_cast<const ObjectAddPacket*>(data);
             onRemoteObjectAdded(*packet);

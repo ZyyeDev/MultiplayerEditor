@@ -1,5 +1,7 @@
+#include "Packets.hpp"
 #include "NetworkManager.hpp"
 #include <Geode/Geode.hpp>
+#include <Geode/binding/GJAccountManager.hpp>
 
 using namespace geode::prelude;
 
@@ -14,13 +16,17 @@ bool NetworkManager::host(uint16_t port){
     address.host = ENET_HOST_ANY;
     address.port = port;
 
-    m_host = enet_host_create(&address, 1, 2, 0, 0);
+    m_host = enet_host_create(&address, maxPlayers, 2, 0, 0);
     if (m_host == nullptr){
         log::error("Failed to create enet host");
         return false;
     }
     m_port = port;
     m_isHost = true;
+
+    // add ourself (host)
+    addPeer(1, getUsername());
+
     log::info("Hosting on port {}", port);
     return true;
 }
@@ -59,6 +65,13 @@ bool NetworkManager::connect(const std::string& ip, uint16_t port){
         log::info("connected to {}:{}!",ip,port);
         m_port = port;
         m_isHost = false;
+        HandshakePacket packet;
+        packet.header.type = PacketType::HANDSHAKE;
+        packet.header.timestamp = getCurrentTimestamp();
+        packet.header.senderID = getPeerID();
+        packet.username = getUsername();
+        
+        sendPacket(&packet, sizeof(packet));
         if (m_onConnect) m_onConnect();
         return true;
     } else {
@@ -149,4 +162,73 @@ void NetworkManager::setOnConnect(std::function<void()> callback){
 
 void NetworkManager::setOnDisconnect(std::function<void()> callback){
     m_onDisconnect = callback;
+}
+
+gd::string NetworkManager::getUsername(){
+    m_username = GJAccountManager::get()->m_username;
+    return m_username;
+}
+
+void NetworkManager::addPeer(uint32_t id, const gd::string& username){
+    m_peersInLobby[id] = username;
+}
+
+void NetworkManager::removePeer(uint32_t id){
+    auto it = m_peersInLobby.find(id);
+    if (it != m_peersInLobby.end()){
+        m_peersInLobby.erase(it);
+    }
+}
+
+void NetworkManager::broadcastPeerJoined(uint32_t peerID, const gd::string& username){
+    PeerJoinedPacket packet;
+    packet.header.type = PacketType::PEER_JOINED;
+    packet.header.timestamp = getCurrentTimestamp();
+    packet.header.senderID = getPeerID();
+    packet.peerID = peerID;
+    strncpy(packet.username, username.c_str(), 63);
+    packet.username[63] = '\0';
+    
+    sendPacket(&packet, sizeof(packet));
+}
+
+
+void NetworkManager::broadcastPeerLeft(uint32_t peerID) {
+    PeerLeftPacket packet;
+    packet.header.type = PacketType::PEER_LEFT;
+    packet.header.timestamp = getCurrentTimestamp();
+    packet.header.senderID = getPeerID();
+    packet.peerID = peerID;
+    
+    sendPacket(&packet, sizeof(packet));
+}
+
+void NetworkManager::sendLobbyState(uint32_t targetPeerID) {
+    LobbySyncPacket packet;
+    packet.header.type = PacketType::LOBBY_SYNC;
+    packet.header.timestamp = getCurrentTimestamp();
+    packet.header.senderID = getPeerID();
+    
+    packet.memberCount = m_peersInLobby.size();
+    
+    size_t i = 0;
+    for (const auto& [id, username] : m_peersInLobby) {
+        if (i >= 32) break;
+        packet.members[i].peerID = id;
+        strncpy(packet.members[i].username, username.c_str(), 63);
+        packet.members[i].username[63] = '\0';
+        i++;
+    }
+    
+    if (targetPeerID != 0) {
+        auto peerIt = m_connectedPeers.find(targetPeerID);
+        if (peerIt != m_connectedPeers.end()) {
+            ENetPacket* enetPacket = enet_packet_create(&packet, sizeof(packet), ENET_PACKET_FLAG_RELIABLE);
+            enet_peer_send(peerIt->second, 0, enetPacket);
+        } else {
+            log::warn("Tried to send lobby state to unknown peer {}", targetPeerID);
+        }
+    } else {
+        sendPacket(&packet, sizeof(packet));
+    }
 }
