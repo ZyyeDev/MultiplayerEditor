@@ -132,7 +132,7 @@ void NetworkManager::poll(){
         switch (event.type){
             case ENET_EVENT_TYPE_CONNECT:
                 log::info("peer connected");
-                
+
                 if (m_isHost) {
                     m_connectedPeers[event.peer->connectID] = event.peer;
                 } else {
@@ -147,7 +147,7 @@ void NetworkManager::poll(){
                 }
                 enet_packet_destroy(event.packet);
                 break;
-            case ENET_EVENT_TYPE_DISCONNECT:
+            case ENET_EVENT_TYPE_DISCONNECT: {
                 uint32_t disconnectedPeerID = event.peer->connectID;
                 log::info("peer {} disconnected", disconnectedPeerID);
 
@@ -160,6 +160,7 @@ void NetworkManager::poll(){
                 }
                 if (m_onDisconnect) m_onDisconnect();
                 break;
+            }
             default:
                 break;
         };
