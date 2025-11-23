@@ -39,6 +39,18 @@ $on_mod(Loaded){
 	g_network = new NetworkManager();
 	g_sync = new SyncManager();
 
+    g_network->setOnDisconnect([]() {
+        if (!g_isHost && g_isInSession) {
+            g_isInSession = false;
+            
+            if (g_sync) {
+                g_sync->cleanUpPlayers();
+            }
+            
+            log::warn("lost connection to host");
+        }
+    });
+
 	log::info("Collab editor loaded!");
 }
 
