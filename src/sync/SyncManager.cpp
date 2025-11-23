@@ -880,8 +880,11 @@ void SyncManager::onRemoteSelectionChanged(const uint32_t& userID){
         highlight->setScaleX(objSize.width / highlight->getContentSize().width);
         highlight->setScaleY(objSize.height / highlight->getContentSize().height);
         
-        highlight->setPosition(obj->getPosition());
-        highlight->setRotation(obj->getRotation());
+        highlight->setAnchorPoint(obj->getAnchorPoint());
+
+        CCPoint anchorPoint = obj->getAnchorPoint();
+        highlight->setPosition(ccp(objSize.width * anchorPoint.x, objSize.height * anchorPoint.y));
+        
         highlight->setZOrder(obj->getZOrder() - 1);
         
         obj->addChild(highlight);
