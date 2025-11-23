@@ -12,7 +12,6 @@ class $modify(CollabMenuLayer, MenuLayer){
         if (!bottomMenu) return false;
 
         /* ---- CREATE BUTTON ---- */
-        // TODO: Change sprite to a custom one, not just a normal button with text
         auto joinSprite = CCSprite::create("multiplayerCollabButton.png"_spr);
         
         auto joinBtn = CCMenuItemSpriteExtra::create(
