@@ -486,18 +486,30 @@ GameObject* SyncManager::createObjectFromData(const ObjectData& data){
     return obj;
 }
 
-void SyncManager::onLocalObjectAdded(GameObject*obj){
+void SyncManager::onLocalObjectAdded(GameObject* obj) {
     std::string uid = generateUID();
     trackObject(uid, obj);
-
-    ObjectAddPacket packet;
+    
+    gd::string gdString = obj->getSaveString(nullptr);
+    std::string objString = std::string(gdString);
+    
+    ObjectStringPacket packet;
     packet.header.type = PacketType::OBJECT_ADD;
     packet.header.timestamp = getCurrentTimestamp();
     packet.header.senderID = g_network->getPeerID();
-    packet.object = extractObjectData(obj);
-
+    
+    strncpy(packet.uid, uid.c_str(), 31);
+    packet.uid[31] = '\0';
+    
+    packet.stringLength = std::min(objString.length(), sizeof(packet.objectString) - 1);
+    strncpy(packet.objectString, objString.c_str(), packet.stringLength);
+    packet.objectString[packet.stringLength] = '\0';
+    
     g_network->sendPacket(&packet, sizeof(packet));
+    
+    log::info("Sent object {} via string ({})", uid, packet.stringLength);
 }
+
 
 void SyncManager::onLocalObjectDestroyed(GameObject* obj) {
     if (!isTrackedObject(obj)) return;
@@ -509,6 +521,7 @@ void SyncManager::onLocalObjectDestroyed(GameObject* obj) {
     packet.header.timestamp = getCurrentTimestamp();
     packet.header.senderID = g_network->getPeerID();
     strncpy(packet.uid, uid.c_str(), 31);
+    packet.uid[31] = '\0';
     
     g_network->sendPacket(&packet, sizeof(packet));
     untrackObject(uid);
@@ -517,16 +530,27 @@ void SyncManager::onLocalObjectDestroyed(GameObject* obj) {
 void SyncManager::onLocalObjectModified(GameObject* obj) {
     if (!isTrackedObject(obj)) return;
     
-    ObjectModifyPacket packet;
+    std::string uid = getObjectUid(obj);
+    
+    gd::string gdString = obj->getSaveString(nullptr);
+    std::string objString = std::string(gdString);
+    
+    ObjectStringPacket packet;
     packet.header.type = PacketType::OBJECT_UPDATE;
     packet.header.timestamp = getCurrentTimestamp();
     packet.header.senderID = g_network->getPeerID();
-    packet.object = extractObjectData(obj);
+    
+    strncpy(packet.uid, uid.c_str(), 31);
+    packet.uid[31] = '\0';
+    
+    packet.stringLength = std::min(objString.length(), sizeof(packet.objectString) - 1);
+    strncpy(packet.objectString, objString.c_str(), packet.stringLength);
+    packet.objectString[packet.stringLength] = '\0';
     
     g_network->sendPacket(&packet, sizeof(packet));
 }
 
-void SyncManager::onRemoteObjectAdded(const ObjectAddPacket& packet) {
+void SyncManager::onRemoteObjectAdded(const ObjectStringPacket& packet) {
     auto editor = getEditorLayer();
     if (!editor) {
         log::error("No editor layer!");
@@ -535,18 +559,27 @@ void SyncManager::onRemoteObjectAdded(const ObjectAddPacket& packet) {
     
     m_applyingRemoteChanges = true;
     
-    auto obj = editor->createObject(packet.object.objectID, {packet.object.x, packet.object.y}, false);
-    if (!obj) {
-        log::error("Failed to create object from data!");
-        m_applyingRemoteChanges = false;
-        return;
+    std::string objString(packet.objectString, packet.stringLength);
+    
+    int countBefore = editor->m_objects ? editor->m_objects->count() : 0;
+    
+    editor->createObjectsFromString(objString, false, false);
+    
+    int countAfter = editor->m_objects ? editor->m_objects->count() : 0;
+    if (countAfter > countBefore) {
+        GameObject* newObj = static_cast<GameObject*>(
+            editor->m_objects->objectAtIndex(countAfter - 1)
+        );
+        
+        std::string uid(packet.uid);
+        trackObject(uid, newObj);
+        
+        log::info("Created object: {}", uid);
+    } else {
+        log::error("Object creation failed!");
     }
     
-    applyObjectData(obj, packet.object);
-    
     m_applyingRemoteChanges = false;
-    
-    trackObject(packet.object.uid, obj);
 }
 
 void SyncManager::onRemoteObjectDestroyed(const ObjectDeletePacket& packet) {
@@ -571,42 +604,86 @@ void SyncManager::onRemoteObjectDestroyed(const ObjectDeletePacket& packet) {
     m_applyingRemoteChanges = false;
 }
 
-void SyncManager::onRemoteObjectModified(const ObjectModifyPacket& packet) {
-    auto it = m_syncedObjects.find(packet.object.uid);
+void SyncManager::onRemoteObjectModified(const ObjectStringPacket& packet) {
+    std::string uid(packet.uid);
+    auto it = m_syncedObjects.find(uid);
+    
     if (it == m_syncedObjects.end()) {
-        log::warn("Tried to modify nonexistent object: {}", packet.object.uid);
+        log::warn("Tried to modify nonexistent object: {}", uid);
         return;
     }
     
-    GameObject* obj = it->second;
-    applyObjectData(obj, packet.object);
+    GameObject* oldObj = it->second;
+    auto editor = getEditorLayer();
+    if (!editor) return;
+    
+    m_applyingRemoteChanges = true;
+    
+    editor->removeObject(oldObj, true);
+    untrackObject(uid);
+    
+    std::string objString(packet.objectString, packet.stringLength);
+    int countBefore = editor->m_objects->count();
+    editor->createObjectsFromString(objString, false, false);
+    
+    int countAfter = editor->m_objects->count();
+    if (countAfter > countBefore) {
+        GameObject* newObj = static_cast<GameObject*>(
+            editor->m_objects->objectAtIndex(countAfter - 1)
+        );
+        trackObject(uid, newObj);
+        log::info("Updated object: {}", uid);
+    }
+    
+    m_applyingRemoteChanges = false;
 }
 
 void SyncManager::sendFullState() {
     auto editor = getEditorLayer();
     if (!editor) return;
     
+    gd::string gdLevelString = editor->getLevelString();
+    std::string lvlString = std::string(gdLevelString);
+
+    log::info("Sending full level string");
+
     auto allObjects = editor->m_objects;
     if (!allObjects) return;
     
-    log::info("Sending full state: {} objects", allObjects->count());
-    
-    for (auto obj : CCArrayExt<GameObject*>(allObjects)) {
-        if (!isTrackedObject(obj)){
+    for (int i = 0; i < allObjects->count(); i++) {
+        auto obj = static_cast<GameObject*>(allObjects->objectAtIndex(i));
+        
+        if (!isTrackedObject(obj)) {
             std::string uid = generateUID();
             trackObject(uid, obj);
         }
-    }
-    
-    for (auto obj : CCArrayExt<GameObject*>(allObjects)){
-        ObjectAddPacket packet;
+        
+        // send this object
+        gd::string gdString = obj->getSaveString(nullptr);
+        std::string objString = std::string(gdString);
+        
+        ObjectStringPacket packet;
         packet.header.type = PacketType::OBJECT_ADD;
         packet.header.timestamp = getCurrentTimestamp();
         packet.header.senderID = g_network->getPeerID();
-        packet.object = extractObjectData(obj);
-
+        
+        std::string uid = getObjectUid(obj);
+        strncpy(packet.uid, uid.c_str(), 31);
+        packet.uid[31] = '\0';
+        
+        packet.stringLength = std::min(objString.length(), sizeof(packet.objectString) - 1);
+        strncpy(packet.objectString, objString.c_str(), packet.stringLength);
+        packet.objectString[packet.stringLength] = '\0';
+        
         g_network->sendPacket(&packet, sizeof(packet));
+        
+        // small delay because meow
+        if (i % 10 == 0) {
+            std::this_thread::sleep_for(std::chrono::milliseconds(10));
+        }
     }
+    
+    log::info("Sent {} objects", allObjects->count());
 
     onLocalLevelSettingsChanged();
 }
@@ -654,7 +731,7 @@ void SyncManager::handlePacket(const uint8_t* data, size_t size) {
             break;
         }
         case PacketType::OBJECT_ADD: {
-            const ObjectAddPacket* packet = reinterpret_cast<const ObjectAddPacket*>(data);
+            const ObjectStringPacket* packet = reinterpret_cast<const ObjectStringPacket*>(data);
             onRemoteObjectAdded(*packet);
             break;
         }
@@ -664,7 +741,7 @@ void SyncManager::handlePacket(const uint8_t* data, size_t size) {
             break;
         }
         case PacketType::OBJECT_UPDATE: {
-            const ObjectModifyPacket* packet = reinterpret_cast<const ObjectModifyPacket*>(data);
+            const ObjectStringPacket* packet = reinterpret_cast<const ObjectStringPacket*>(data);
             onRemoteObjectModified(*packet);
             break;
         }

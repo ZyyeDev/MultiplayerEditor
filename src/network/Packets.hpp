@@ -275,6 +275,13 @@ struct ObjectData {
     float gravityValue;
 };
 
+struct ObjectStringPacket {
+    PacketHeader header;
+    char uid[32];
+    uint32_t stringLength;
+    char objectString[4096];
+};
+
 struct ObjectAddPacket{
     PacketHeader header;
     ObjectData object;

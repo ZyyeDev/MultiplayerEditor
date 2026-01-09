@@ -78,9 +78,9 @@ class SyncManager{
 
         /* --- REMOTE EVENTS --- */
         // object stuff
-        void onRemoteObjectAdded(const ObjectAddPacket& packet);
+        void onRemoteObjectAdded(const ObjectStringPacket& packet);
         void onRemoteObjectDestroyed(const ObjectDeletePacket& packet);
-        void onRemoteObjectModified(const ObjectModifyPacket& packet);
+        void onRemoteObjectModified(const ObjectStringPacket& packet);
 
         // selection stuff
         void onRemoteCursorUpdate(const uint32_t& userID, int x, int y);
