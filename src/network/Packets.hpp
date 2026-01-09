@@ -315,6 +315,7 @@ struct LevelSettingsData{
     // Audio
     int songID;
     int customSongID;
+    float startOffset;
     
     // Colors
     int backgroundColorID;

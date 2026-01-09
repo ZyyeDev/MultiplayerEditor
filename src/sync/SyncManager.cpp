@@ -678,9 +678,9 @@ void SyncManager::sendFullState() {
         g_network->sendPacket(&packet, sizeof(packet));
         
         // small delay because meow
-        if (i % 10 == 0) {
-            std::this_thread::sleep_for(std::chrono::milliseconds(10));
-        }
+        //if (i % 10 == 0) {
+        //    std::this_thread::sleep_for(std::chrono::milliseconds(10));
+        //}
     }
     
     log::info("Sent {} objects", allObjects->count());
@@ -995,6 +995,8 @@ LevelSettingsData SyncManager::extractLevelSettings(){
         log::error("m_levelSettings is null!!");
         return data;
     }
+
+    data.startOffset = settings->m_songOffset;
     
     // color settings - using pointer access
     data.backgroundColorID = settings->m_backgroundIndex;
@@ -1101,6 +1103,8 @@ void SyncManager::onRemoteLevelSettingsChanged(const LevelSettingsPacket& packet
 }
 
 void SyncManager::onLocalLevelSettingsChanged() {
+    auto editorLayer = LevelEditorLayer::get();
+    if (!editorLayer || !editorLayer->m_levelSettings) return;
     LevelSettingsPacket packet;
     packet.header.type = PacketType::LEVEL_SETTINGS;
     packet.header.timestamp = getCurrentTimestamp();
@@ -1273,7 +1277,9 @@ void SyncManager::onRemotePlayerPosition(const PlayerPositionPacket& packet, Lev
 void SyncManager::cleanUpPlayers() {
     for (auto& [userId, remotePlayer] : m_remotePlayers) {
         if (remotePlayer.player) {
-            remotePlayer.player->removeFromParent();
+            if (remotePlayer.player->getParent()){
+                remotePlayer.player->removeFromParent();
+            }
         }
     }
     m_remotePlayers.clear();
