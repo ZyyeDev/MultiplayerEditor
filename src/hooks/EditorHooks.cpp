@@ -17,7 +17,7 @@ void objectModified(GameObject* object){
 }
 
 void settingsUpdate(){
-    if (g_isInSession && g_sync && !g_sync->isApplyingRemoteChanges()){
+    if (g_isInSession && g_sync && g_isHost && !g_sync->isApplyingRemoteChanges()) {
         g_sync->onLocalLevelSettingsChanged();
     }
 }
@@ -84,6 +84,17 @@ class $modify(MyLevelEditorLayer, LevelEditorLayer){
 };
 
 class $modify(EditorUI){
+    bool init(LevelEditorLayer* editorLayer) {
+        if (!EditorUI::init(editorLayer)) return false;
+        if (g_isInSession && !g_isHost){
+            auto settingsbtn = this->getChildByID("settings-button");
+            if (settingsbtn){
+                settingsbtn->setVisible(false);
+            }
+        }
+        return true;
+    }
+
     /* -- TRANSFORM -- */
     void transformObjectCall(EditCommand cmd) {
         EditorUI::transformObjectCall(cmd);
