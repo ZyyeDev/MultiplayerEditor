@@ -642,8 +642,8 @@ void SyncManager::sendFullState() {
     auto editor = getEditorLayer();
     if (!editor) return;
     
-    gd::string gdLevelString = editor->getLevelString();
-    std::string lvlString = std::string(gdLevelString);
+    //gd::string gdLevelString = editor->getLevelString();
+    //std::string lvlString = std::string(gdLevelString);
 
     log::info("Sending full level string");
 
