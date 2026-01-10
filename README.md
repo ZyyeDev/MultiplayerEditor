@@ -2,8 +2,9 @@
 
 A multiplayer Geometry Dash mod for building levels with others, made using [enet](https://github.com/lsalzman/enet).
 
-⚠️ **Development Status**: This mod is functional but incomplete. 
-I'm releasing it publicly in hopes that someone might want to contribute, and **I'm not actively developing it anymore**. Not all object properties sync yet because I can't find them anywhere.
+**⚠️ PROJECT STATUS: NO LONGER ACTIVELY MAINTAINED** This mod was a fun project made out of boredom. It is functional but incomplete. I'm leaving the source code open for anyone who wants to improve it or anything,
+
+----------------------------------------------------------
 
 ## Installation
 
