@@ -10,7 +10,7 @@ extern bool g_isInSession;
 
 HostPopup* HostPopup::create(){
     auto ret = new HostPopup();
-    if (ret->initAnchored(320.0f,280.0f)){
+    if (ret->init()){
         ret->autorelease();
         return ret;
     }
@@ -18,7 +18,8 @@ HostPopup* HostPopup::create(){
     return nullptr;
 }
 
-bool HostPopup::setup(){
+bool HostPopup::init(){
+    if (!Popup::init(320.0f, 280.0f)) return false;
     this->setTitle("Host Session");
 
     auto winSize = this->m_mainLayer->getContentSize();
@@ -102,21 +103,6 @@ void HostPopup::onStartHost(CCObject*){
             "You are now hosting!",
             "OK"
         )->show();
-
-        g_network->setOnConnect([]() {
-            log::info("Client connected");
-
-            if (g_sync){
-                g_sync->sendFullState();
-            } else {
-                // i dont think this can happen, but just in case. No one knows.
-                FLAlertLayer::create(
-                    "ERROR",
-                    "Couldn't sendfull state: g_sync is null! Please report.",
-                    "OK" 
-                )->show();
-            }
-        });
     } else {
         FLAlertLayer::create(
             "Error",

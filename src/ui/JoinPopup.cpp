@@ -12,7 +12,7 @@ extern bool g_isInSession;
 
 JoinPopup* JoinPopup::create(){
     auto ret = new JoinPopup();
-    if (ret->initAnchored(320.0f,280.0f)){
+    if (ret->init()){
         ret->autorelease();
         return ret;
     }
@@ -20,7 +20,8 @@ JoinPopup* JoinPopup::create(){
     return nullptr;
 }
 
-bool JoinPopup::setup(){
+bool JoinPopup::init(){
+    if (!Popup::init(320.0f, 280.0f)) return false;
     this->setTitle("Join Session");
 
     auto winSize = this->m_mainLayer->getContentSize();

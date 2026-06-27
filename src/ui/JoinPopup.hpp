@@ -4,11 +4,11 @@
 
 using namespace geode::prelude;
 
-class JoinPopup : public Popup <> {
+class JoinPopup : public Popup{
     protected:
         TextInput* m_ipInput;
         
-        bool setup() override;
+        bool init() override;
         void OnJoin(CCObject*);
     public:
         static JoinPopup* create();

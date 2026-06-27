@@ -5,10 +5,10 @@
 
 using namespace geode::prelude;
 
-class JoinSessionPopup : public geode::Popup<> {
-    protected:
-        bool setup() override;
-        void onConnect(CCObject*);
-    public:
-        static JoinSessionPopup* create();
+class JoinSessionPopup : public geode::Popup{
+public:
+    static JoinSessionPopup* create();
+protected:
+    bool init() override;
+    void onConnect(CCObject*);
 };

@@ -1,6 +1,7 @@
 #include "Popups.hpp"
 
-bool JoinSessionPopup::setup(){
+bool JoinSessionPopup::init(){
+    if (!Popup::init(300, 200)) return false;
     auto winSize = CCDirector::sharedDirector()->getWinSize();
     this->setTitle("Join Session");
 
@@ -13,7 +14,7 @@ void JoinSessionPopup::onConnect(CCObject *){
 
 JoinSessionPopup* JoinSessionPopup::create(){
     auto ret = new JoinSessionPopup();
-    if (ret && ret->initAnchored(300,200)){
+    if (ret && ret->init()){
         ret->autorelease();
         return ret;
     }
