@@ -73,7 +73,7 @@ void JoinPopup::OnJoin(CCObject*){
     log::info("Attempting to join: {}", ip);
 
     // connect to ip
-    if (g_network->connect(ip,7777)){
+    if (g_network->connect(ip,g_network->m_port)){
         g_isHost = false;
         g_isInSession = true;
 

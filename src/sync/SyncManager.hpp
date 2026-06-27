@@ -3,8 +3,7 @@
 #include <Geode/Geode.hpp>
 #include <map>
 #include <string>
-#include <queue>
-#include <string>
+#include <unordered_set>
 #include <algorithm>
 
 #include "../network/Packets.hpp"
@@ -28,11 +27,6 @@ class SyncManager{
 
         std::string generateUID();
 
-        GameObject* createObjectFromData(const ObjectData& data);
-        void applyObjectData(GameObject* obj, const ObjectData& data);
-
-        ObjectData extractObjectData(GameObject* obj);
-
         bool shouldApplyUpdate(uint32_t remoteTimestamp);
         uint32_t m_lastUpdateTimestamp;
 
@@ -40,6 +34,9 @@ class SyncManager{
         uint32_t m_userID;
 
         bool m_applyingRemoteChanges = false;
+
+        /* -- LOCAL OBJECT OWNERSHIP (for undo thingy) -- */
+        std::unordered_set<GameObject*> m_localObjects;
 
         /* -- SELECTION -- */
         std::map<uint32_t, std::vector<CCSprite*>> m_remoteSelectionHighlights;
@@ -49,13 +46,13 @@ class SyncManager{
         CCArray* m_Selection;
 
         /* -- LEVEL SETTINGS -- */
-        LevelSettingsData extractLevelSettings();
-        void applyLevelSettings(const LevelSettingsData& settings);
+        std::string extractSettingsString();
+        void applySettingsString(const char* str, uint32_t len);
 
         /* -- PLAYER SYNC -- */
         std::map<uint32_t, RemotePlayer> m_remotePlayers;
         float m_lastPlayerSendTime = 0.0f;
-        
+
     public:
         SyncManager();
 
@@ -64,7 +61,7 @@ class SyncManager{
         void onLocalObjectAdded(GameObject* obj);
         void onLocalObjectDestroyed(GameObject* obj);
         void onLocalObjectModified(GameObject* obj);
-        
+
         // selection stuff
         void onLocalCursorUpdate(CCPoint position);
         void onLocalSelectionChanged(CCArray* selectedObjects);
@@ -93,10 +90,10 @@ class SyncManager{
         void onRemotePlayerPosition(const PlayerPositionPacket& packet, LevelEditorLayer* editorLayer);
 
         /* --- FULL SYNC --- */
-        void sendFullState();
-        void reciveFullState(const uint8_t* data, size_t size);
+        void sendFullState(uint32_t targetPeerID);
         void trackExistingObjects();
-        
+        void syncAfterUndoRedo();
+
         /* -- OTHERS -- */
         void handlePacket(const uint8_t* data, size_t size);
 
@@ -113,6 +110,6 @@ class SyncManager{
         std::string getObjectUid(GameObject* obj);
 
         void cleanUpPlayers();
-        
+
         uint32_t getUserID() { return SyncManager::m_userID; }
 };

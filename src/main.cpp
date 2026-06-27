@@ -15,7 +15,7 @@ NetworkManager* g_network = nullptr;
 SyncManager* g_sync = nullptr;
 
 // session states
-int port = 7777; // this isnt used at all, must be implemented in the future!!
+int port = 8080; // this isnt used at all, must be implemented in the future!!
 bool g_isHost = false;
 bool g_isInSession = false;
 

@@ -3,15 +3,18 @@
 #include <Geode/modify/EditorUI.hpp>
 
 #include "../sync/SyncManager.hpp"
+#include "../network/NetworkManager.hpp"
+#include "../network/Packets.hpp"
 
 using namespace geode::prelude;
 
 extern SyncManager* g_sync;
+extern NetworkManager* g_network;
 extern bool g_isInSession;
 extern bool g_isHost;
 
 void objectModified(GameObject* object){
-    if (g_isInSession){
+    if (g_isInSession && g_sync && !g_sync->isApplyingRemoteChanges()){
         g_sync->onLocalObjectModified(object);
     }
 }
@@ -26,6 +29,34 @@ class $modify(MyLevelEditorLayer, LevelEditorLayer){
     struct Fields {
         bool m_playtesting = false;
     };
+
+    void onEnterTransitionDidFinish() {
+        LevelEditorLayer::onEnterTransitionDidFinish();
+        if (g_isInSession && !g_isHost && g_network) {
+            FullSyncRequestPacket pkt;
+            pkt.header.type = PacketType::FULL_SYNC_REQUEST;
+            pkt.header.timestamp = getCurrentTimestamp();
+            pkt.header.senderID = g_network->getPeerID();
+            g_network->sendPacket(&pkt, sizeof(pkt));
+        }
+    }
+
+    /*
+    // why are they inlines :sob:
+    void undoLastAction() {
+        LevelEditorLayer::undoLastAction();
+        if (g_isInSession && g_sync && !g_sync->isApplyingRemoteChanges()) {
+            g_sync->syncAfterUndoRedo();
+        }
+    }
+
+    void redoLastAction() {
+        LevelEditorLayer::redoLastAction();
+        if (g_isInSession && g_sync && !g_sync->isApplyingRemoteChanges()) {
+            g_sync->syncAfterUndoRedo();
+        }
+    }
+        */
 
     /* -- add obj -- */
     void addKeyframe(KeyframeGameObject* p0) {
@@ -106,45 +137,60 @@ class $modify(EditorUI){
     }
 
     void scaleObjects(CCArray* p0, float p1, float p2, CCPoint p3, ObjectScaleType p4, bool p5) {
+        EditorUI::scaleObjects(p0, p1, p2, p3, p4, p5);
         for (auto obj : CCArrayExt<GameObject*>(p0)){
             objectModified(obj);
         }
-        EditorUI::scaleObjects(p0, p1, p2, p3, p4, p5);
     }
 
     void rotateObjects(CCArray* p0, float p1, CCPoint p2) {
+        EditorUI::rotateObjects(p0, p1, p2);
         for (auto obj : CCArrayExt<GameObject*>(p0)){
             objectModified(obj);
         }
-        EditorUI::rotateObjects(p0, p1, p2);
     }
 
-    // idk if this is really related to transform things, but ill leave it just in case
-    void updateButtons() {
-        if (g_isInSession && g_sync && !g_sync->isApplyingRemoteChanges()) {
-            auto selected = this->getSelectedObjects();
-            if (selected && selected->count() > 0) {
-                for (auto obj : CCArrayExt<GameObject*>(selected)) {
-                    g_sync->onLocalObjectModified(obj);
-                }
-            }
-        }
-
-        EditorUI::updateButtons();
-    }
-    
     /* -- delete --*/
     void onDeleteSelected(CCObject* sender) {
-        auto selected = this->getSelectedObjects();
-
         if (g_isInSession && g_sync){
+            auto selected = this->getSelectedObjects();
             for (auto obj : CCArrayExt<GameObject*>(selected)){
-                g_sync->onLocalObjectDestroyed(obj);
+                if (g_sync->isTrackedObject(obj)) {
+                    g_sync->onLocalObjectDestroyed(obj);
+                }
             }
         }
 
         EditorUI::onDeleteSelected(sender);
     }
+
+    void onDuplicate(CCObject* sender) {
+        EditorUI::onDuplicate(sender);
+
+        if (g_isInSession && g_sync && !g_sync->isApplyingRemoteChanges()){
+            auto selected = this->getSelectedObjects();
+            for (auto obj : CCArrayExt<GameObject*>(selected)){
+                if (!g_sync->isTrackedObject(obj)) {
+                    g_sync->onLocalObjectAdded(obj);
+                }
+            }
+        }
+    }
+
+    /*
+    void pasteObjects(gd::string p0) {
+        EditorUI::pasteObjects(p0);
+
+        if (g_isInSession && g_sync && !g_sync->isApplyingRemoteChanges()){
+            auto selected = this->getSelectedObjects();
+            for (auto obj : CCArrayExt<GameObject*>(selected)){
+                if (!g_sync->isTrackedObject(obj)) {
+                    g_sync->onLocalObjectAdded(obj);
+                }
+            }
+        }
+    }
+    */
 
     void ccTouchMoved(CCTouch* touch, CCEvent* event) {
         EditorUI::ccTouchMoved(touch, event);
@@ -161,6 +207,17 @@ class $modify(EditorUI){
             CCPoint worldPos = objLayer->convertToNodeSpace(glPos);
 
             g_sync->onLocalCursorUpdate(worldPos);
+        }
+    }
+
+    void ccTouchEnded(CCTouch* touch, CCEvent* event) {
+        EditorUI::ccTouchEnded(touch, event);
+
+        if (g_isInSession && g_sync && !g_sync->isApplyingRemoteChanges()){
+            auto selected = this->getSelectedObjects();
+            for (auto obj : CCArrayExt<GameObject*>(selected)){
+                objectModified(obj);
+            }
         }
     }
 
@@ -205,4 +262,22 @@ class $modify(EditorUI){
         
         EditorUI::deselectAll();
     }
+
+    /*
+    void onUndoButton(CCObject* sender) {
+        EditorUI::onUndoButton(sender);
+
+        if (g_isInSession && g_sync && !g_sync->isApplyingRemoteChanges()){
+            g_sync->syncAfterUndoRedo();
+        }
+    }
+
+    void onRedoButton(CCObject* sender) {
+        EditorUI::onRedoButton(sender);
+
+        if (g_isInSession && g_sync && !g_sync->isApplyingRemoteChanges()){
+            g_sync->syncAfterUndoRedo();
+        }
+    }
+    */
 };

@@ -15,10 +15,10 @@ class NetworkManager{
 
         uint16_t m_port;
 
-        // TODO: for now port will ALWAYS be 7777, however in the future you should be able to change it
-        bool host(uint16_t port = 7777);
+        // TODO: for now port will ALWAYS be m_port, however in the future you should be able to change it
+        bool host(uint16_t port);
         bool stopHosting();
-        bool connect(const std::string& ip, uint16_t port = 7777);
+        bool connect(const std::string& ip, uint16_t port);
         void disconnect();
 
         uint32_t getPeerID() const {
@@ -32,10 +32,11 @@ class NetworkManager{
         }
 
         void sendPacket(const void* data, size_t size);
+        void sendPacketToPeer(uint32_t peerID, const void* data, size_t size);
         void poll();
 
         void setOnRecive(std::function<void(const uint8_t*, size_t)> callback);
-        void setOnConnect(std::function<void()> callback);
+        void setOnConnect(std::function<void(uint32_t)> callback);
         void setOnDisconnect(std::function<void()> callback);
 
         bool isConnected() const { return m_peer != nullptr; }
@@ -57,7 +58,7 @@ class NetworkManager{
         gd::string m_username;
 
         std::function<void(const uint8_t*, size_t)> m_onReceive;
-        std::function<void()> m_onConnect;
+        std::function<void(uint32_t)> m_onConnect;
         std::function<void()> m_onDisconnect;
 
         std::map<uint32_t, ENetPeer*> m_connectedPeers;

@@ -81,7 +81,7 @@ void HostPopup::onStartHost(CCObject*){
     }
 
     // TODO: The user should be able to chose the port they are hosting
-    if (g_network->host(7777)){
+    if (g_network->host(g_network->m_port)){
         if (hostBtn){
             hostBtn->setSprite(ButtonSprite::create("Stop Hosting", "goldFont.fnt", "GJ_button_01.png", .8f));
         }
@@ -92,7 +92,7 @@ void HostPopup::onStartHost(CCObject*){
 
         // for now, just show local ip
         // it should show local ip, or hamachi ip (or whatever the user is using)
-        m_ipLabel->setString("127.0.0.1:7777");
+        m_ipLabel->setString("127.0.0.1");
 
         g_sync->trackExistingObjects();
         

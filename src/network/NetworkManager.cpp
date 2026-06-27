@@ -72,7 +72,7 @@ bool NetworkManager::connect(const std::string& ip, uint16_t port){
         packet.username = getUsername();
         
         sendPacket(&packet, sizeof(packet));
-        if (m_onConnect) m_onConnect();
+        if (m_onConnect) m_onConnect(event.peer->connectID);
         return true;
     } else {
         //log::error("connection failed, event.type is {}", event.type);
@@ -98,8 +98,11 @@ void NetworkManager::disconnect(){
         m_peer = nullptr;
     }
 
-    if (m_host){
+    if (m_isHost && m_host){
         stopHosting();
+    } else if (m_host) {
+        enet_host_destroy(m_host);
+        m_host = nullptr;
     }
 }
 
@@ -109,19 +112,24 @@ void NetworkManager::sendPacket(const void* data, size_t size){
     ENetPacket* packet = enet_packet_create(data, size, ENET_PACKET_FLAG_RELIABLE);
     if (!packet) return;
 
-    if (m_isHost && m_host->connectedPeers > 0){
-        // dont send packets if no peers connected
+    if (m_isHost){
         if (m_host->connectedPeers == 0){
             enet_packet_destroy(packet);
             return;
         }
         enet_host_broadcast(m_host, 0, packet);
     } else {
-        if (!m_peer){
-            return;
-        }
+        if (!m_peer) return;
         enet_peer_send(m_peer, 0, packet);
     }
+}
+
+void NetworkManager::sendPacketToPeer(uint32_t peerID, const void* data, size_t size){
+    auto it = m_connectedPeers.find(peerID);
+    if (it == m_connectedPeers.end()) return;
+    ENetPacket* packet = enet_packet_create(data, size, ENET_PACKET_FLAG_RELIABLE);
+    if (!packet) return;
+    enet_peer_send(it->second, 0, packet);
 }
 
 void NetworkManager::poll(){
@@ -139,7 +147,7 @@ void NetworkManager::poll(){
                     m_peer = event.peer;
                 }
 
-                if (m_onConnect) m_onConnect();
+                if (m_onConnect) m_onConnect(event.peer->connectID);
                 break;
             case ENET_EVENT_TYPE_RECEIVE:
                 if (m_onReceive){
@@ -171,7 +179,7 @@ void NetworkManager::setOnRecive(std::function<void(const uint8_t*, size_t)> cal
     m_onReceive = callback;
 }
 
-void NetworkManager::setOnConnect(std::function<void()> callback){
+void NetworkManager::setOnConnect(std::function<void(uint32_t)> callback){
     m_onConnect = callback;
 }
 

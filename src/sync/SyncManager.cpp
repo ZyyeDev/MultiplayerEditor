@@ -1,4 +1,5 @@
 #include <Geode/Geode.hpp>
+#include <sstream>
 #include "SyncManager.hpp"
 #include "../network/NetworkManager.hpp"
 #include "../network/Packets.hpp"
@@ -51,444 +52,10 @@ LevelEditorLayer* SyncManager::getEditorLayer(){
     return scene->getChildByType<LevelEditorLayer>(0);
 }
 
-ObjectData SyncManager::extractObjectData(GameObject* obj) {
-    ObjectData data;
-    memset(&data, 0, sizeof(data));
-
-    std::string uid = getObjectUid(obj);
-    strncpy(data.uid, uid.c_str(), 31);
-    data.uid[31] = '\0';
-
-    data.objectID = obj->m_objectID;
-    data.x = obj->getPositionX();
-    data.y = obj->getPositionY();
-    data.rotation = obj->getRotation();
-    data.scaleX = obj->getScaleX();
-    data.scaleY = obj->getScaleY();
-    data.isFlippedX = obj->isFlipX();
-    data.isFlippedY = obj->isFlipY();
-    
-    data.hasBeenActivated = obj->m_isActivated;
-    data.objectType = obj->m_objectType;
-    data.startPositionPoint = obj->m_startPosition;
-    data.useAudioScale = obj->m_usesAudioScale;
-
-    data.zLayer = obj->m_zLayer;
-    data.zOrder = obj->getZOrder();
-    data.editorLayer = obj->m_editorLayer;
-    data.editorLayer2 = obj->m_editorLayer2;
-
-    if (obj->m_baseColor) {
-        data.baseColorID = *obj->m_baseColor;
-    }
-    data.detailColorID = obj->m_activeDetailColorID;
-    data.dontEnter = obj->m_isDontEnter;
-    data.dontFade = obj->m_isDontFade;
-    
-    data.baseUsesHSV = obj->m_baseUsesHSV;
-    data.detailUsesHSV = obj->m_detailUsesHSV;
-    if (obj->m_baseUsesHSV && obj->m_baseColor) {
-        data.hasHSV = true;
-        data.hue = obj->m_baseColor->m_hsv.h;
-        data.saturation = obj->m_baseColor->m_hsv.s;
-        data.brightness = obj->m_baseColor->m_hsv.v;
-        data.saturationChecked = obj->m_baseColor->m_hsv.absoluteSaturation;
-        data.brightnessChecked = obj->m_baseColor->m_hsv.absoluteBrightness;
-    }
-
-    if (obj->m_groups) {
-        data.groups = *obj->m_groups;
-        int groupCount = 0;
-        for (int i = 0; i < 10; i++) {
-            if ((*obj->m_groups)[i] != 0) {
-                groupCount++;
-            }
-        }
-        data.groupCount = groupCount;
-    }else{
-        data.groups = {};
-    }
-
-    data.isVisible = obj->isVisible();
-    data.highDetail = obj->m_isHighDetail;
-    data.editorEnabled = obj->m_editorEnabled;
-
-    data.linkedGroup = obj->m_linkedGroup;
-    data.uniqueID = obj->m_uniqueID;
-
-    if (auto* textObj = typeinfo_cast<TextGameObject*>(obj)) {
-        strncpy(data.textString, textObj->m_text.c_str(), 255);
-        data.textString[255] = '\0';
-    }
-
-    if (auto* effectObj = typeinfo_cast<EffectGameObject*>(obj)) {
-        data.duration = effectObj->m_duration;
-        data.targetGroupID = effectObj->m_targetGroupID;
-        data.centerGroupID = effectObj->m_centerGroupID;
-        data.touchTriggered = effectObj->m_isTouchTriggered;
-        data.spawnTriggered = effectObj->m_isSpawnTriggered;
-        data.multiTrigger = effectObj->m_isMultiTriggered;
-        data.triggerOnExit = effectObj->m_triggerOnExit;
-        
-        data.touchHoldMode = effectObj->m_touchHoldMode;
-        data.touchToggleMode = effectObj->m_touchToggleMode;
-        data.touchPlayerMode = effectObj->m_touchPlayerMode;
-        
-        data.opacity = effectObj->m_opacity;
-        data.copyOpacity = effectObj->m_copyOpacity;
-        data.targetColor = effectObj->m_targetColor;
-        data.colorID = effectObj->m_activeMainColorID;
-        data.copyColorID = effectObj->m_copyColorID;
-        data.fadeTime = effectObj->m_fadeOutDuration;
-        data.fadeTime = effectObj->m_fadeInDuration;
-        data.blending = effectObj->m_usesBlending;
-        data.colorIDSecondary = effectObj->m_activeDetailColorID;
-        
-        data.hsvValue = effectObj->m_hsvValue;
-        
-        data.moveX = effectObj->m_moveModX;
-        data.moveY = effectObj->m_moveModY;
-        data.easingType = effectObj->m_easingType;
-        data.easingRate = effectObj->m_easingRate;
-        data.lockToPlayerX = effectObj->m_lockToPlayerX;
-        data.lockToPlayerY = effectObj->m_lockToPlayerY;
-        data.useMoveTarget = effectObj->m_useMoveTarget;
-        data.moveTargetMode = effectObj->m_moveTargetMode;
-        data.lockToCameraX = effectObj->m_lockToCameraX;
-        data.lockToCameraY = effectObj->m_lockToCameraY;
-        
-        data.dontBoostX = effectObj->m_isDontBoostX;
-        data.dontBoostY = effectObj->m_isDontBoostY;
-        
-        data.degrees = effectObj->m_rotationDegrees;
-        data.times360 = effectObj->m_times360;
-        data.lockObjectRotation = effectObj->m_lockObjectRotation;
-        
-        data.pulseMode = effectObj->m_pulseMode;
-        data.pulseType = effectObj->m_pulseTargetType;
-        data.fadeIn = effectObj->m_fadeInDuration;
-        data.hold = effectObj->m_holdDuration;
-        data.fadeOut = effectObj->m_fadeOutDuration;
-        data.mainOnly = effectObj->m_pulseMainOnly;
-        data.detailOnly = effectObj->m_pulseDetailOnly;
-        data.exclusiveMode = effectObj->m_pulseExclusive;
-        
-        data.spawnDelay = effectObj->m_spawnTriggerDelay;
-        
-        data.followXMod = effectObj->m_followXMod;
-        data.followYMod = effectObj->m_followYMod;
-        data.followYSpeed = effectObj->m_followYSpeed;
-        data.followYDelay = effectObj->m_followYDelay;
-        data.followYOffset = effectObj->m_followYOffset;
-        data.followYMaxSpeed = effectObj->m_followYMaxSpeed;
-        
-        data.shakeStrength = effectObj->m_shakeStrength;
-        data.shakeInterval = effectObj->m_shakeInterval;
-        
-        data.animationID = effectObj->m_animationID;
-        data.animationSpeed = effectObj->m_animationSpeed;
-        data.randomizeAnimationStart = effectObj->m_animationRandomizedStart;
-        
-        data.itemID = effectObj->m_itemID;
-        data.activateGroup = effectObj->m_activateGroup;
-        data.multiActivate = effectObj->canAllowMultiActivate();
-        
-        data.teleportGravity = effectObj->m_gravityValue;
-        
-        data.randomFrameTime = effectObj->m_randomFrameTime;
-        
-        data.particleID = effectObj->m_particleString.size() > 0 ? std::stoi(effectObj->m_particleString) : 0;
-        
-        data.itemID = effectObj->m_itemID;
-        data.itemID2 = effectObj->m_itemID2;
-        
-        data.gravityValue = effectObj->m_gravityValue;
-    }
-    
-    if (auto* effectObj = typeinfo_cast<EffectGameObject*>(obj)) {
-        data.isReverse = effectObj->m_isReverse;
-        
-        data.isFreeMode = effectObj->m_cameraIsFreeMode;
-        data.cameraEasing = effectObj->m_cameraEasingValue;
-        data.cameraZoom = effectObj->m_zoomValue;
-        
-        data.speedModType = effectObj->m_speedModType;
-        
-        data.hasAreaParent = effectObj->m_hasAreaParent;
-        data.areaTintOpacity = effectObj->m_areaOpacityValue;
-        
-        data.enterChannel = effectObj->m_enterChannel;
-        data.enterType = effectObj->m_enterType;
-        
-        data.usesPlayerColor1 = effectObj->m_usesPlayerColor1;
-        data.usesPlayerColor2 = effectObj->m_usesPlayerColor2;
-        
-        data.dynamicMode = effectObj->m_isDynamicMode;
-        // idk
-        //data.comparisonMode = !effectObj->m_isDynamicMode;
-    }
-    
-    if (obj->m_particle) {
-        data.hasParticles = true;
-        auto particles = obj->m_particle;
-        data.particleLifetime = particles->getLife();
-        data.particleStartSize = particles->getStartSize();
-        data.particleEndSize = particles->getEndSize();
-        data.particleStartSpin = particles->getStartSpin();
-        data.particleEndSpin = particles->getEndSpin();
-        data.particleEmissionRate = particles->getEmissionRate();
-        data.particleAngle = particles->getAngle();
-        data.particleSpeed = particles->getSpeed();
-        
-        auto posVar = particles->getPosVar();
-        data.particlePosVarX = posVar.x;
-        data.particlePosVarY = posVar.y;
-        
-        auto gravity = particles->getGravity();
-        data.particleGravityX = gravity.x;
-        data.particleGravityY = gravity.y;
-        
-        data.particleAccelRadial = particles->getRadialAccel();
-        data.particleAccelTangential = particles->getTangentialAccel();
-        
-        auto startColor = particles->getStartColor();
-        data.particleStartColorR = startColor.r * 255;
-        data.particleStartColorG = startColor.g * 255;
-        data.particleStartColorB = startColor.b * 255;
-        data.particleStartColorA = startColor.a * 255;
-        
-        auto endColor = particles->getEndColor();
-        data.particleEndColorR = endColor.r * 255;
-        data.particleEndColorG = endColor.g * 255;
-        data.particleEndColorB = endColor.b * 255;
-        data.particleEndColorA = endColor.a * 255;
-        
-        data.particleFadeInTime = particles->getLife() > 0;
-        data.particleFadeOutTime = particles->getLife() > 0;
-        data.particleStartSizeVar = particles->getStartSizeVar();
-        data.particleEndSizeVar = particles->getEndSizeVar();
-        data.particleStartSpinVar = particles->getStartSpinVar();
-        data.particleEndSpinVar = particles->getEndSpinVar();
-    }
-    
-    data.hasNoEffects = obj->m_hasNoEffects;
-
-    return data;
-}
-
-void SyncManager::applyObjectData(GameObject* obj, const ObjectData& data) {
-    if (!obj) return;
-    
-    obj->setPosition(ccp(data.x, data.y));
-    obj->setRotation(data.rotation);
-    obj->setScaleX(data.scaleX);
-    obj->setScaleY(data.scaleY);
-    obj->setFlipX(data.isFlippedX);
-    obj->setFlipY(data.isFlippedY);
-    
-    obj->m_isActivated = data.hasBeenActivated;
-    obj->m_objectType = data.objectType;
-    obj->m_startPosition = data.startPositionPoint;
-    obj->m_usesAudioScale = data.useAudioScale;
-    
-    obj->m_zLayer = data.zLayer;
-    obj->setZOrder(data.zOrder);
-    obj->m_editorLayer = data.editorLayer;
-    obj->m_editorLayer2 = data.editorLayer2;
-    
-    if (obj->m_baseColor) {
-        *obj->m_baseColor = data.baseColorID;
-    }
-    obj->m_activeDetailColorID = data.detailColorID;
-    obj->m_isDontEnter = data.dontEnter;
-    obj->m_isDontFade = data.dontFade;
-    
-    obj->m_baseUsesHSV = data.baseUsesHSV;
-    obj->m_detailUsesHSV = data.detailUsesHSV;
-    if (data.hasHSV && obj->m_baseColor) {
-        obj->m_baseColor->m_hsv.h = data.hue;
-        obj->m_baseColor->m_hsv.s = data.saturation;
-        obj->m_baseColor->m_hsv.v = data.brightness;
-        obj->m_baseColor->m_hsv.absoluteSaturation = data.saturationChecked;
-        obj->m_baseColor->m_hsv.absoluteBrightness = data.brightnessChecked;
-    }
-    
-    if (data.groupCount > 0) {
-        if (!obj->m_groups) {
-            obj->m_groups = new std::array<int16_t, 10>();
-        }
-        *obj->m_groups = data.groups;
-    }
-    
-    obj->setVisible(data.isVisible);
-    obj->m_isHighDetail = data.highDetail;
-    obj->m_editorEnabled = data.editorEnabled;
-    
-    obj->m_linkedGroup = data.linkedGroup;
-    obj->m_uniqueID = data.uniqueID;
-    
-    if (auto* textObj = typeinfo_cast<TextGameObject*>(obj)) {
-        textObj->m_text = std::string(data.textString);
-    }
-    
-    if (auto* effectObj = typeinfo_cast<EffectGameObject*>(obj)) {
-        effectObj->m_duration = data.duration;
-        effectObj->m_targetGroupID = data.targetGroupID;
-        effectObj->m_centerGroupID = data.centerGroupID;
-        effectObj->m_isTouchTriggered = data.touchTriggered;
-        effectObj->m_isSpawnTriggered = data.spawnTriggered;
-        effectObj->m_isMultiTriggered = data.multiTrigger;
-        effectObj->m_triggerOnExit = data.triggerOnExit;
-        
-        effectObj->m_touchHoldMode = data.touchHoldMode;
-        effectObj->m_touchToggleMode = data.touchToggleMode;
-        effectObj->m_touchPlayerMode = data.touchPlayerMode;
-        
-        effectObj->m_opacity = data.opacity;
-        effectObj->m_copyOpacity = data.copyOpacity;
-        effectObj->m_targetColor = data.targetColor;
-        effectObj->m_activeMainColorID = data.colorID;
-        effectObj->m_copyColorID = data.copyColorID;
-        effectObj->m_fadeOutDuration = data.fadeTime;
-        effectObj->m_fadeInDuration = data.fadeTime;
-        effectObj->m_usesBlending = data.blending;
-        effectObj->m_activeDetailColorID = data.colorIDSecondary;
-        
-        effectObj->m_hsvValue = data.hsvValue;
-        
-        effectObj->m_moveModX = data.moveX;
-        effectObj->m_moveModY = data.moveY;
-        effectObj->m_easingType = data.easingType;
-        effectObj->m_easingRate = data.easingRate;
-        effectObj->m_lockToPlayerX = data.lockToPlayerX;
-        effectObj->m_lockToPlayerY = data.lockToPlayerY;
-        effectObj->m_useMoveTarget = data.useMoveTarget;
-        effectObj->m_moveTargetMode = data.moveTargetMode;
-        effectObj->m_lockToCameraX = data.lockToCameraX;
-        effectObj->m_lockToCameraY = data.lockToCameraY;
-        
-        effectObj->m_isDontBoostX = data.dontBoostX;
-        effectObj->m_isDontBoostY = data.dontBoostY;
-        
-        effectObj->m_rotationDegrees = data.degrees;
-        effectObj->m_times360 = data.times360;
-        effectObj->m_lockObjectRotation = data.lockObjectRotation;
-        
-        effectObj->m_pulseMode = data.pulseMode;
-        effectObj->m_pulseTargetType = data.pulseType;
-        effectObj->m_fadeInDuration = data.fadeIn;
-        effectObj->m_holdDuration = data.hold;
-        effectObj->m_fadeOutDuration = data.fadeOut;
-        effectObj->m_pulseMainOnly = data.mainOnly;
-        effectObj->m_pulseDetailOnly = data.detailOnly;
-        effectObj->m_pulseExclusive = data.exclusiveMode;
-        
-        effectObj->m_spawnTriggerDelay = data.spawnDelay;
-        
-        effectObj->m_followXMod = data.followXMod;
-        effectObj->m_followYMod = data.followYMod;
-        effectObj->m_followYSpeed = data.followYSpeed;
-        effectObj->m_followYDelay = data.followYDelay;
-        effectObj->m_followYOffset = data.followYOffset;
-        effectObj->m_followYMaxSpeed = data.followYMaxSpeed;
-        
-        effectObj->m_shakeStrength = data.shakeStrength;
-        effectObj->m_shakeInterval = data.shakeInterval;
-        
-        effectObj->m_animationID = data.animationID;
-        effectObj->m_animationSpeed = data.animationSpeed;
-        effectObj->m_animationRandomizedStart = data.randomizeAnimationStart;
-        
-        effectObj->m_itemID = data.itemID;
-        effectObj->m_activateGroup = data.activateGroup;
-        
-        effectObj->m_gravityValue = data.teleportGravity;
-        
-        effectObj->m_randomFrameTime = data.randomFrameTime;
-        
-        if (data.particleID > 0) {
-            effectObj->m_particleString = std::to_string(data.particleID);
-        }
-        
-        effectObj->m_itemID = data.itemID;
-        effectObj->m_itemID2 = data.itemID2;
-        
-        effectObj->m_gravityValue = data.gravityValue;
-        
-        effectObj->m_isReverse = data.isReverse;
-        
-        effectObj->m_cameraIsFreeMode = data.isFreeMode;
-        effectObj->m_cameraEasingValue = data.cameraEasing;
-        effectObj->m_zoomValue = data.cameraZoom;
-        
-        effectObj->m_speedModType = data.speedModType;
-        
-        effectObj->m_hasAreaParent = data.hasAreaParent;
-        effectObj->m_areaOpacityValue = data.areaTintOpacity;
-        
-        effectObj->m_enterChannel = data.enterChannel;
-        effectObj->m_enterType = data.enterType;
-        
-        effectObj->m_usesPlayerColor1 = data.usesPlayerColor1;
-        effectObj->m_usesPlayerColor2 = data.usesPlayerColor2;
-        
-        effectObj->m_isDynamicMode = data.dynamicMode;
-    }
-    
-    if (data.hasParticles && obj->m_particle) {
-        auto particles = obj->m_particle;
-        particles->setLife(data.particleLifetime);
-        particles->setStartSize(data.particleStartSize);
-        particles->setEndSize(data.particleEndSize);
-        particles->setStartSpin(data.particleStartSpin);
-        particles->setEndSpin(data.particleEndSpin);
-        particles->setEmissionRate(data.particleEmissionRate);
-        particles->setAngle(data.particleAngle);
-        particles->setSpeed(data.particleSpeed);
-        
-        particles->setPosVar(ccp(data.particlePosVarX, data.particlePosVarY));
-        particles->setGravity(ccp(data.particleGravityX, data.particleGravityY));
-        
-        particles->setRadialAccel(data.particleAccelRadial);
-        particles->setTangentialAccel(data.particleAccelTangential);
-        
-        ccColor4F startColor;
-        startColor.r = data.particleStartColorR / 255.0f;
-        startColor.g = data.particleStartColorG / 255.0f;
-        startColor.b = data.particleStartColorB / 255.0f;
-        startColor.a = data.particleStartColorA / 255.0f;
-        particles->setStartColor(startColor);
-        
-        ccColor4F endColor;
-        endColor.r = data.particleEndColorR / 255.0f;
-        endColor.g = data.particleEndColorG / 255.0f;
-        endColor.b = data.particleEndColorB / 255.0f;
-        endColor.a = data.particleEndColorA / 255.0f;
-        particles->setEndColor(endColor);
-        
-        particles->setStartSizeVar(data.particleStartSizeVar);
-        particles->setEndSizeVar(data.particleEndSizeVar);
-        particles->setStartSpinVar(data.particleStartSpinVar);
-        particles->setEndSpinVar(data.particleEndSpinVar);
-    }
-    
-    obj->m_hasNoEffects = data.hasNoEffects;
-}
-
-GameObject* SyncManager::createObjectFromData(const ObjectData& data){
-    auto obj = GameObject::createWithKey(data.objectID);
-    if (!obj) {
-        log::error("GameObject::createWithKey failed for ID {}", data.objectID);
-        return nullptr;
-    }
-    
-    applyObjectData(obj, data);
-    return obj;
-}
-
 void SyncManager::onLocalObjectAdded(GameObject* obj) {
     std::string uid = generateUID();
     trackObject(uid, obj);
+    m_localObjects.insert(obj);
     
     gd::string gdString = obj->getSaveString(nullptr);
     std::string objString = std::string(gdString);
@@ -506,8 +73,6 @@ void SyncManager::onLocalObjectAdded(GameObject* obj) {
     packet.objectString[packet.stringLength] = '\0';
     
     g_network->sendPacket(&packet, sizeof(packet));
-    
-    log::info("Sent object {} via string ({})", uid, packet.stringLength);
 }
 
 
@@ -516,6 +81,12 @@ void SyncManager::onLocalObjectDestroyed(GameObject* obj) {
     
     std::string uid = getObjectUid(obj);
     
+    for (auto& [userId, highlights] : m_remoteSelectionHighlights) {
+        highlights.erase(std::remove_if(highlights.begin(), highlights.end(), [obj](CCSprite* sprite){
+            return sprite && sprite->getParent() == obj;
+        }), highlights.end());
+    }
+
     ObjectDeletePacket packet;
     packet.header.type = PacketType::OBJECT_DELETE;
     packet.header.timestamp = getCurrentTimestamp();
@@ -524,6 +95,7 @@ void SyncManager::onLocalObjectDestroyed(GameObject* obj) {
     packet.uid[31] = '\0';
     
     g_network->sendPacket(&packet, sizeof(packet));
+    m_localObjects.erase(obj);
     untrackObject(uid);
 }
 
@@ -584,23 +156,30 @@ void SyncManager::onRemoteObjectAdded(const ObjectStringPacket& packet) {
 
 void SyncManager::onRemoteObjectDestroyed(const ObjectDeletePacket& packet) {
     auto it = m_syncedObjects.find(packet.uid);
-    if (it == m_syncedObjects.end()) {
-        log::warn("Tried to delete nonexistent object: {}", packet.uid);
-        return;
-    }
+    if (it == m_syncedObjects.end()) return;
     
     auto editor = getEditorLayer();
-    if (!editor) {
-        log::error("No editor layer for destroy!");
-        return;
-    }
+    if (!editor) return;
     
     GameObject* obj = it->second;
+
+    for (auto& [userId, highlights] : m_remoteSelectionHighlights) {
+        highlights.erase(std::remove_if(highlights.begin(), highlights.end(), [obj](CCSprite* sprite){
+            return sprite && sprite->getParent() == obj;
+        }), highlights.end());
+    }
+
+    // no crashes (i hope)
+    if (m_localObjects.count(obj)) {
+        if (editor->m_undoObjects) editor->m_undoObjects->removeAllObjects();
+        if (editor->m_redoObjects) editor->m_redoObjects->removeAllObjects();
+    }
     
+    m_localObjects.erase(obj);
     untrackObject(packet.uid);
     
     m_applyingRemoteChanges = true;
-    editor->removeObject(obj, true);
+    editor->removeObject(obj, false);
     m_applyingRemoteChanges = false;
 }
 
@@ -608,18 +187,22 @@ void SyncManager::onRemoteObjectModified(const ObjectStringPacket& packet) {
     std::string uid(packet.uid);
     auto it = m_syncedObjects.find(uid);
     
-    if (it == m_syncedObjects.end()) {
-        log::warn("Tried to modify nonexistent object: {}", uid);
-        return;
-    }
+    if (it == m_syncedObjects.end()) return;
     
     GameObject* oldObj = it->second;
     auto editor = getEditorLayer();
-    if (!editor) return;
+    if (!editor || !editor->m_objects) return;
     
     m_applyingRemoteChanges = true;
-    
-    editor->removeObject(oldObj, true);
+
+    for (auto& [userId, highlights] : m_remoteSelectionHighlights) {
+        highlights.erase(std::remove_if(highlights.begin(), highlights.end(), [oldObj](CCSprite* sprite){
+            return sprite && sprite->getParent() == oldObj;
+        }), highlights.end());
+    }
+
+    m_localObjects.erase(oldObj);
+    editor->removeObject(oldObj, false);
     untrackObject(uid);
     
     std::string objString(packet.objectString, packet.stringLength);
@@ -632,60 +215,64 @@ void SyncManager::onRemoteObjectModified(const ObjectStringPacket& packet) {
             editor->m_objects->objectAtIndex(countAfter - 1)
         );
         trackObject(uid, newObj);
-        log::info("Updated object: {}", uid);
+    } else {
+        log::error("Object update failed for uid: {}", uid);
     }
     
     m_applyingRemoteChanges = false;
 }
 
-void SyncManager::sendFullState() {
+void SyncManager::sendFullState(uint32_t targetPeerID) {
     auto editor = getEditorLayer();
     if (!editor) return;
-    
-    //gd::string gdLevelString = editor->getLevelString();
-    //std::string lvlString = std::string(gdLevelString);
-
-    log::info("Sending full level string");
 
     auto allObjects = editor->m_objects;
     if (!allObjects) return;
-    
+
     for (int i = 0; i < allObjects->count(); i++) {
         auto obj = static_cast<GameObject*>(allObjects->objectAtIndex(i));
-        
+
         if (!isTrackedObject(obj)) {
             std::string uid = generateUID();
             trackObject(uid, obj);
         }
-        
-        // send this object
+
         gd::string gdString = obj->getSaveString(nullptr);
         std::string objString = std::string(gdString);
-        
+
         ObjectStringPacket packet;
         packet.header.type = PacketType::OBJECT_ADD;
         packet.header.timestamp = getCurrentTimestamp();
         packet.header.senderID = g_network->getPeerID();
-        
+
         std::string uid = getObjectUid(obj);
         strncpy(packet.uid, uid.c_str(), 31);
         packet.uid[31] = '\0';
-        
+
         packet.stringLength = std::min(objString.length(), sizeof(packet.objectString) - 1);
         strncpy(packet.objectString, objString.c_str(), packet.stringLength);
         packet.objectString[packet.stringLength] = '\0';
-        
-        g_network->sendPacket(&packet, sizeof(packet));
-        
-        // small delay because meow
-        //if (i % 10 == 0) {
-        //    std::this_thread::sleep_for(std::chrono::milliseconds(10));
-        //}
-    }
-    
-    log::info("Sent {} objects", allObjects->count());
 
-    onLocalLevelSettingsChanged();
+        g_network->sendPacketToPeer(targetPeerID, &packet, sizeof(packet));
+    }
+
+    LevelSettingsPacket settingsPkt;
+    settingsPkt.header.type = PacketType::LEVEL_SETTINGS;
+    settingsPkt.header.timestamp = getCurrentTimestamp();
+    settingsPkt.header.senderID = g_network->getPeerID();
+    std::string settingsStr = extractSettingsString();
+    settingsPkt.settingsLength = (uint32_t)std::min(settingsStr.size(), sizeof(settingsPkt.settingsString) - 1);
+    memcpy(settingsPkt.settingsString, settingsStr.c_str(), settingsPkt.settingsLength);
+    settingsPkt.settingsString[settingsPkt.settingsLength] = '\0';
+    g_network->sendPacketToPeer(targetPeerID, &settingsPkt, sizeof(settingsPkt));
+
+    FullSyncEndPacket endPkt;
+    endPkt.header.type = PacketType::FULL_SYNC_END;
+    endPkt.header.timestamp = getCurrentTimestamp();
+    endPkt.header.senderID = g_network->getPeerID();
+    g_network->sendPacketToPeer(targetPeerID, &endPkt, sizeof(endPkt));
+
+    log::info("Sent full state ({} objects) to peer {}", allObjects->count(), targetPeerID);
 }
 
 void SyncManager::handlePacket(const uint8_t* data, size_t size) {
@@ -710,7 +297,7 @@ void SyncManager::handlePacket(const uint8_t* data, size_t size) {
             break;
         }
         case PacketType::PEER_LEFT: {
-            const PeerJoinedPacket* packet = reinterpret_cast<const PeerJoinedPacket*>(data);
+            const PeerLeftPacket* packet = reinterpret_cast<const PeerLeftPacket*>(data);
             g_network->removePeer(packet->peerID);
             log::info("peer left {}", packet->peerID);
             break;
@@ -728,6 +315,23 @@ void SyncManager::handlePacket(const uint8_t* data, size_t size) {
             }
 
             log::info("lobby synced: {} members", packet->memberCount);
+            break;
+        }
+        case PacketType::FULL_SYNC_REQUEST: {
+            if (g_isHost) {
+                sendFullState(header->senderID);
+            }
+            break;
+        }
+        case PacketType::FULL_SYNC_END: {
+            m_localObjects.clear();
+            m_syncedObjects.clear();
+            m_objectToUID.clear();
+            trackExistingObjects();
+            auto editor = getEditorLayer();
+            if (editor && editor->m_editorUI) {
+                editor->m_editorUI->updateButtons();
+            }
             break;
         }
         case PacketType::OBJECT_ADD: {
@@ -758,7 +362,7 @@ void SyncManager::handlePacket(const uint8_t* data, size_t size) {
                 uids.push_back(std::string(packet->uids[i]));
             }
             
-            // if this is the first chunk, clear previous selection
+            // if this is the first chunk clear previous
             if (packet->chunkIndex == 0) {
                 m_remoteSelections[packet->header.senderID].clear();
             }
@@ -775,6 +379,7 @@ void SyncManager::handlePacket(const uint8_t* data, size_t size) {
             break;
         }
         case PacketType::LEVEL_SETTINGS: {
+            if (size < sizeof(PacketHeader) + sizeof(uint32_t)) break;
             const LevelSettingsPacket* packet = reinterpret_cast<const LevelSettingsPacket*>(data);
             onRemoteLevelSettingsChanged(*packet);
             break;
@@ -823,43 +428,34 @@ void SyncManager::onLocalCursorUpdate(CCPoint position){
 }
 
 void SyncManager::onRemoteCursorUpdate(const uint32_t& userID, int x, int y){
-    auto it = m_remoteCursors.find(userID);
-
     CCPoint position = ccp(x, y);
 
+    auto it = m_remoteCursors.find(userID);
     if (it == m_remoteCursors.end()){
         auto editor = getEditorLayer();
-        if (!editor){
-            return;
-        }
-        if (!editor->m_objectLayer){
-            return;
-        }
+        if (!editor || !editor->m_objectLayer) return;
 
         auto cursor = CCSprite::create("cursor.png"_spr);
-        if (!cursor) {
-            log::error("failed to create cursor sprite!");
-            return;
-        }
+        if (!cursor) return;
         
-        editor->m_objectLayer->addChild(cursor);
         cursor->setZOrder(INT_MAX);
         cursor->setPosition(position);
-        
-        // TODO
-        /*
-        auto label = CCLabelBMFont::create(username, "chatFont.fnt");
-        label->setScale(0.5f);
-        cursor->addChild(label);
-        label->setPosition(
-            ccp(
-                cursor->getContentSize().width / 2,
-                cursor->getContentSize().height + 5
-             ));
-        */
+
+        auto peers = g_network->m_peersInLobby;
+        auto nameIt = peers.find(userID);
+        if (nameIt != peers.end()) {
+            auto label = CCLabelBMFont::create(nameIt->second.c_str(), "chatFont.fnt");
+            label->setScale(0.45f);
+            label->setPosition(ccp(
+                cursor->getContentSize().width / 2.f,
+                cursor->getContentSize().height + 6.f
+            ));
+            label->setZOrder(1);
+            cursor->addChild(label);
+        }
+
+        editor->m_objectLayer->addChild(cursor);
         m_remoteCursors[userID] = cursor;
-        
-        log::info("created cursor for user: {}", userID);
     } else {
         it->second->setPosition(position);
     }
@@ -969,150 +565,62 @@ void SyncManager::onRemoteSelectionChanged(const uint32_t& userID){
     }
 }
 
-LevelSettingsData SyncManager::extractLevelSettings(){
-    LevelSettingsData data;
-    memset(&data, 0, sizeof(data));
-
+std::string SyncManager::extractSettingsString() {
     auto editor = getEditorLayer();
-    
-    if (!editor) {
-        log::error("cant get editor layer!!");
-        return data;
-    }
-
-    auto level = editor->m_level;
-    if (!level) {
-        log::error("level is null!");
-        return data;
-    }
-
-    // audio settings
-    data.songID = level->m_audioTrack;
-    data.customSongID = level->m_songID;
-
-    auto settings = editor->m_levelSettings;
-    if (!settings) {
-        log::error("m_levelSettings is null!!");
-        return data;
-    }
-
-    data.startOffset = settings->m_songOffset;
-    
-    // color settings - using pointer access
-    data.backgroundColorID = settings->m_backgroundIndex;
-    data.groundColorID = settings->m_groundIndex;
-    //data.lineColorID = settings->m_lineIndex;
-    //data.objectColorID = settings->m_objectIndex;
-    //data.color1ID = settings->m_color1Index;
-    //data.color2ID = settings->m_color2Index;
-    //data.color3ID = settings->m_color3Index;
-    //data.color4ID = settings->m_color4Index;
-    
-    data.backgroundIndex = settings->m_backgroundIndex;
-    data.groundIndex = settings->m_groundIndex;
-    data.fontIndex = settings->m_fontIndex;
-
-    // gameplay settings
-    data.isPlatformer = level->isPlatformer();
-    data.gamemode = settings->m_startMode;
-    //data.miniMode = settings->m_isMini;
-    //data.dualMode = settings->m_isDualMode;
-    data.twoPlayerMode = level->m_twoPlayerMode;
-    data.speed = settings->m_startSpeed;
-
-    // guideline
-    //data.guidelineSpacing = settings->m_guidelineSpacing;
-
-    return data;
+    if (!editor) return "";
+    gd::string gs = editor->getLevelString();
+    std::string s(gs);
+    size_t sep = s.find(';');
+    return sep != std::string::npos ? s.substr(0, sep) : s;
 }
 
-void SyncManager::applyLevelSettings(const LevelSettingsData& data) {
+void SyncManager::applySettingsString(const char* str, uint32_t len) {
+    if (len == 0) return;
     auto editor = getEditorLayer();
-    if (!editor) {
-        log::error("cant get editor layer");
-        return;
-    }
+    if (!editor || !editor->m_levelSettings) return;
 
-    auto level = editor->m_level;
-    if (!level) {
-        log::error("level is null!!");
-        return;
+    std::string settingsStr(str, len);
+    gd::vector<gd::string> values;
+    gd::vector<void*> exists;
+
+    std::string token;
+    std::stringstream ss(settingsStr);
+    while (std::getline(ss, token, ',')) {
+        if (!token.empty()) {
+            values.push_back(gd::string(token.c_str()));
+        }
     }
+    exists.resize(values.size(), reinterpret_cast<void*>(1));
 
     m_applyingRemoteChanges = true;
+    //editor->m_levelSettings->customObjectSetup(values, exists);
+    m_applyingRemoteChanges = false;
 
-    level->m_audioTrack = data.songID;
-    level->m_songID = data.customSongID;
-
-    auto settings = editor->m_levelSettings;
-    if (!settings) {
-        log::error("m_levelSettings is null!");
-        m_applyingRemoteChanges = false;
-        return;
-    }
-    
-    // color settings
-    settings->m_backgroundIndex = data.backgroundColorID;
-    settings->m_groundIndex = data.groundColorID;
-    //settings->m_lineIndex = data.lineColorID;
-    //settings->m_objectIndex = data.objectColorID;
-    //settings->m_color1Index = data.color1ID;
-    //settings->m_color2Index = data.color2ID;
-    //settings->m_color3Index = data.color3ID;
-    //settings->m_color4Index = data.color4ID;
-    
-    settings->m_backgroundIndex = data.backgroundIndex;
-    settings->m_groundIndex = data.groundIndex;
-    settings->m_fontIndex = data.fontIndex;
-
-    // gameplay
-    level->m_twoPlayerMode = data.twoPlayerMode;
-    settings->m_startMode = data.gamemode;
-    //settings->m_isMini = data.miniMode;
-    //settings->m_isDualMode = data.dualMode;
-    settings->m_startSpeed = data.speed;
-
-    // guideline
-    //settings->m_guidelineSpacing = data.guidelineSpacing;
-    
-    if (editor->m_editorUI){
+    if (editor->m_editorUI) {
         editor->m_editorUI->updateButtons();
     }
-    
-    if (level->m_songID != 0) {
-        // custom song
-        auto songInfo = MusicDownloadManager::sharedState()->getSongInfoObject(level->m_songID);
-        if (songInfo) {
-            FMODAudioEngine::sharedEngine()->playMusic(songInfo->m_songUrl, true, 1.0f, 1);
-        }
-    } else {
-        // official song
-        FMODAudioEngine::sharedEngine()->playMusic(
-            fmt::format("song{}.mp3", level->m_audioTrack), 
-            true, 
-            1.0f, 
-            1
-        );
-    }
-    
-    m_applyingRemoteChanges = false;
 }
 
 void SyncManager::onRemoteLevelSettingsChanged(const LevelSettingsPacket& packet) {
-    applyLevelSettings(packet.settings);
+    if (g_isHost) return;
+    applySettingsString(packet.settingsString, packet.settingsLength);
 }
 
 void SyncManager::onLocalLevelSettingsChanged() {
     auto editorLayer = LevelEditorLayer::get();
     if (!editorLayer || !editorLayer->m_levelSettings) return;
+
     LevelSettingsPacket packet;
     packet.header.type = PacketType::LEVEL_SETTINGS;
     packet.header.timestamp = getCurrentTimestamp();
     packet.header.senderID = g_network->getPeerID();
-    packet.settings = extractLevelSettings();
-    
+
+    std::string settingsStr = extractSettingsString();
+    packet.settingsLength = (uint32_t)std::min(settingsStr.size(), sizeof(packet.settingsString) - 1);
+    memcpy(packet.settingsString, settingsStr.c_str(), packet.settingsLength);
+    packet.settingsString[packet.settingsLength] = '\0';
+
     g_network->sendPacket(&packet, sizeof(packet));
-    log::info("sent level settings to remote!");
 }
 
 void SyncManager::trackExistingObjects(){
@@ -1126,6 +634,64 @@ void SyncManager::trackExistingObjects(){
         if (!isTrackedObject(obj)){
             std::string uid = generateUID();
             trackObject(uid, obj);
+        }
+    }
+}
+
+void SyncManager::syncAfterUndoRedo() {
+    auto editor = getEditorLayer();
+    if (!editor || !editor->m_objects) return;
+
+    std::unordered_set<GameObject*> editorObjects;
+    editorObjects.reserve(editor->m_objects->count());
+    for (int i = 0; i < editor->m_objects->count(); i++) {
+        editorObjects.insert(static_cast<GameObject*>(editor->m_objects->objectAtIndex(i)));
+    }
+
+    // removed by undo
+    std::vector<std::string> removed;
+    for (auto& [uid, obj] : m_syncedObjects) {
+        if (!editorObjects.count(obj)) {
+            ObjectDeletePacket pkt;
+            pkt.header.type = PacketType::OBJECT_DELETE;
+            pkt.header.timestamp = getCurrentTimestamp();
+            pkt.header.senderID = g_network->getPeerID();
+            strncpy(pkt.uid, uid.c_str(), 31);
+            pkt.uid[31] = '\0';
+            g_network->sendPacket(&pkt, sizeof(pkt));
+            removed.push_back(uid);
+        }
+    }
+    for (auto& uid : removed) {
+        m_localObjects.erase(m_syncedObjects[uid]);
+        untrackObject(uid);
+
+        for (auto& [userId, selection] : m_remoteSelections) {
+            selection.erase(std::remove(selection.begin(), selection.end(), uid), selection.end());
+        }
+    }
+
+    if (!removed.empty()) {
+        for (auto& [userId, selection] : m_remoteSelections) {
+            onRemoteSelectionChanged(userId);
+        }
+    }
+
+    // restored by undo
+    for (auto obj : CCArrayExt<GameObject*>(editor->m_objects)) {
+        if (!isTrackedObject(obj)) {
+            onLocalObjectAdded(obj);
+        }
+    }
+
+    if (editor->m_editorUI) {
+        auto selected = editor->m_editorUI->getSelectedObjects();
+        if (selected) {
+            for (auto obj : CCArrayExt<GameObject*>(selected)) {
+                if (isTrackedObject(obj)) {
+                    onLocalObjectModified(obj);
+                }
+            }
         }
     }
 }
@@ -1211,7 +777,9 @@ void SyncManager::onRemotePlayerPosition(const PlayerPositionPacket& packet, Lev
                 remotePlayer->setVisible(false);
                 remotePlayer->destroyObject();
             }
+            m_remotePlayers.erase(it);
         }
+        return;
     }
 
     if (it == m_remotePlayers.end()) {
