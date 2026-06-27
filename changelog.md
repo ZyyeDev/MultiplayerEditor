@@ -1,3 +1,8 @@
+# 0.0.3
+- **UPDATED TO GEODE 5**
+- A **_TON_** of bugfixes
+- Made everything sync up (almost)
+
 # 0.0.2
 - **Fixed a crash that occurred when opening the Level Settings menu while in a session.**
 - **Fix clients overriting host's level settings when joining.**
