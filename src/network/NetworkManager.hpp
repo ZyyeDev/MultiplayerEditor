@@ -50,6 +50,8 @@ class NetworkManager{
         void broadcastPeerJoined(uint32_t peerID, const gd::string& username);
         void broadcastPeerLeft(uint32_t peerID);
         void sendLobbyState(uint32_t targetPeerID = 0); // 0 = send to all
+
+        void gotKicked(std::string reason);
     private:
         ENetHost* m_host;
         ENetPeer* m_peer;

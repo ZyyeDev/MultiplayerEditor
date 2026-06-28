@@ -70,6 +70,7 @@ bool NetworkManager::connect(const std::string& ip, uint16_t port){
         packet.header.timestamp = getCurrentTimestamp();
         packet.header.senderID = getPeerID();
         packet.username = getUsername();
+        packet.version = Mod::get()->getVersion();
         
         sendPacket(&packet, sizeof(packet));
         if (m_onConnect) m_onConnect(event.peer->connectID);
@@ -254,4 +255,22 @@ void NetworkManager::sendLobbyState(uint32_t targetPeerID) {
     } else {
         sendPacket(&packet, sizeof(packet));
     }
+}
+
+void NetworkManager::gotKicked(std::string reason){
+    if (m_onDisconnect){
+        m_onDisconnect();
+    }
+
+    auto scene = CCScene::create();
+    auto menuLayer = MenuLayer::create();
+    scene->addChild(menuLayer);
+
+    CCDirector::sharedDirector()->replaceScene(CCTransitionFade::create(0.5f,scene));
+
+    FLAlertLayer::create(
+        "You Got Kicked!",
+        "Reason: " + reason,
+        "Ok"
+    );
 }

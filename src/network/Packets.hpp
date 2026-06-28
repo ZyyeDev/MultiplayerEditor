@@ -24,6 +24,7 @@ enum class PacketType : uint8_t {
     LOBBY_SYNC = 11,
     FULL_SYNC_REQUEST = 12,
     FULL_SYNC_END = 13,
+    KICK_USER = 14,
 };
 
 #pragma pack(push, 1)
@@ -34,9 +35,16 @@ struct PacketHeader{
     uint32_t senderID;
 };
 
+struct KickPacket {
+    PacketHeader header;
+    uint32_t userToKick;
+    std::string kickReason;
+};
+
 struct HandshakePacket{
     PacketHeader header;
     gd::string username;
+    geode::VersionInfo version;
 };
 
 struct ObjectStringPacket {

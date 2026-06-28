@@ -283,11 +283,36 @@ void SyncManager::handlePacket(const uint8_t* data, size_t size) {
     switch (header->type) {
         case PacketType::HANDSHAKE: {
             const HandshakePacket* packet = reinterpret_cast<const HandshakePacket*>(data);
+            // i think we want to do this in another way but it works for now
+            if (packet->version != Mod::get()->getVersion()){
+                if (g_isHost){
+                    KickPacket _kickPacket;
+                    _kickPacket.header.type = PacketType::KICK_USER;
+                    _kickPacket.header.timestamp = getCurrentTimestamp();
+                    _kickPacket.header.senderID = g_network->getPeerID();
+
+                    _kickPacket.userToKick = packet->header.senderID;
+                    _kickPacket.kickReason = "Version Mismatch";
+
+                    g_network->sendPacketToPeer(
+                        packet->header.senderID,
+                        &_kickPacket,
+                        sizeof(_kickPacket)
+                    );
+                }
+                break;
+            }
             g_network->addPeer(packet->header.senderID, packet->username);
             if (g_isHost){
                 g_network->sendLobbyState(packet->header.senderID);
                 g_network->broadcastPeerJoined(packet->header.senderID, packet->username);
             }
+            break;
+        }
+        case PacketType::KICK_USER: {
+            const KickPacket* packet = reinterpret_cast<const KickPacket*>(data);
+            g_network->removePeer(packet->userToKick);
+            log::info("peer left {}", packet->userToKick);
             break;
         }
         case PacketType::PEER_JOINED: {
