@@ -46,6 +46,16 @@ bool HostPopup::init(){
         m_ipLabel->setString(std::format("127.0.0.1:{}", g_network->m_port).c_str());
     }
 
+    // port input
+    m_portInput = TextInput::create(100.0f, std::to_string(g_network->m_port), "chatFont.fnt");
+    m_portInput->setFilter("1234567890");
+    m_portInput->setString(std::to_string(g_network->m_port));
+    m_portInput->setPosition(ccp(
+        winSize.width/2,
+        winSize.height/2 + 10
+    ));
+    this->m_mainLayer->addChild(m_portInput);
+
     // host button
     hostBtn = CCMenuItemSpriteExtra::create(
         ButtonSprite::create("Host", "goldFont.fnt", "GJ_button_01.png", .8f),
@@ -54,7 +64,7 @@ bool HostPopup::init(){
     );
     hostBtn->setPosition(ccp(
         winSize.width/2,
-        winSize.height/2+30
+        winSize.height/2-20
     ));
     if (g_isHost && g_isInSession){
         hostBtn->setSprite(ButtonSprite::create("Stop Hosting", "goldFont.fnt", "GJ_button_01.png", .8f));
@@ -80,8 +90,19 @@ void HostPopup::onStartHost(CCObject*){
         return;
     }
 
-    // TODO: The user should be able to chose the port they are hosting
-    if (g_network->host(g_network->m_port)){
+    uint16_t port = g_network->m_port;
+    if (m_portInput){
+        std::string portStr = m_portInput->getString();
+        if (!portStr.empty()){
+            try {
+                port = static_cast<uint16_t>(std::stoi(portStr));
+            } catch (...) {
+                port = g_network->m_port;
+            }
+        }
+    }
+
+    if (g_network->host(port)){
         if (hostBtn){
             hostBtn->setSprite(ButtonSprite::create("Stop Hosting", "goldFont.fnt", "GJ_button_01.png", .8f));
         }
@@ -92,7 +113,7 @@ void HostPopup::onStartHost(CCObject*){
 
         // for now, just show local ip
         // it should show local ip, or hamachi ip (or whatever the user is using)
-        m_ipLabel->setString("127.0.0.1");
+        m_ipLabel->setString(std::format("127.0.0.1:{}", port).c_str());
 
         g_sync->trackExistingObjects();
         

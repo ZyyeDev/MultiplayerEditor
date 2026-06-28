@@ -6,7 +6,6 @@
 
 #include "network/NetworkManager.hpp"
 #include "sync/SyncManager.hpp"
-#include "ui/Popups.hpp"
 
 using namespace geode::prelude;
 
@@ -15,7 +14,6 @@ NetworkManager* g_network = nullptr;
 SyncManager* g_sync = nullptr;
 
 // session states
-int port = 8080; // this isnt used at all, must be implemented in the future!!
 bool g_isHost = false;
 bool g_isInSession = false;
 

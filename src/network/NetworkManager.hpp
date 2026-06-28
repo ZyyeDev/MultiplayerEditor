@@ -13,7 +13,7 @@ class NetworkManager{
         NetworkManager();
         ~NetworkManager();
 
-        uint16_t m_port;
+        uint16_t m_port = 8080;
 
         // TODO: for now port will ALWAYS be m_port, however in the future you should be able to change it
         bool host(uint16_t port);

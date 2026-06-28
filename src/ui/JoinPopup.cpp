@@ -43,6 +43,24 @@ bool JoinPopup::init(){
     ));
     this->m_mainLayer->addChild(m_ipInput);
 
+    // port input
+    auto portLabel = CCLabelBMFont::create("Port:","bigFont.fnt");
+    portLabel->setScale(0.5f);
+    portLabel->setPosition(ccp(
+        winSize.width/2,
+        winSize.height/2 - 25
+    ));
+    this->m_mainLayer->addChild(portLabel);
+
+    m_portInput = TextInput::create(100.0f, std::to_string(g_network->m_port), "chatFont.fnt");
+    m_portInput->setFilter("1234567890");
+    m_portInput->setString(std::to_string(g_network->m_port));
+    m_portInput->setPosition(ccp(
+        winSize.width/2,
+        winSize.height/2 - 55
+    ));
+    this->m_mainLayer->addChild(m_portInput);
+
     // Join button
     auto joinBtn = CCMenuItemSpriteExtra::create(
         ButtonSprite::create("Join","goldFont.fnt","GJ_button_01.png",0.8f),
@@ -51,7 +69,7 @@ bool JoinPopup::init(){
     );
     joinBtn->setPosition(ccp(
         winSize.width/2,
-        winSize.height/2 -40
+        winSize.height/2 -90
     ));
 
     auto menu = CCMenu::create();
@@ -70,10 +88,20 @@ void JoinPopup::OnJoin(CCObject*){
         return;
     }
 
-    log::info("Attempting to join: {}", ip);
+    uint16_t port = g_network->m_port;
+    std::string portStr = m_portInput->getString();
+    if (!portStr.empty()){
+        try {
+            port = static_cast<uint16_t>(std::stoi(portStr));
+        } catch (...) {
+            port = g_network->m_port;
+        }
+    }
+
+    log::info("Attempting to join: {}:{}", ip, port);
 
     // connect to ip
-    if (g_network->connect(ip,g_network->m_port)){
+    if (g_network->connect(ip,port)){
         g_isHost = false;
         g_isInSession = true;
 
