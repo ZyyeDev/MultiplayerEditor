@@ -15,7 +15,6 @@ class NetworkManager{
 
         uint16_t m_port = 8080;
 
-        // TODO: for now port will ALWAYS be m_port, however in the future you should be able to change it
         bool host(uint16_t port);
         bool stopHosting();
         bool connect(const std::string& ip, uint16_t port);
@@ -43,7 +42,7 @@ class NetworkManager{
         bool isHost() const { return m_isHost; }
         
         std::map<uint32_t, gd::string> m_peersInLobby;
-        std::string getUsername();
+        gd::string getUsername();
 
         void addPeer(uint32_t id, const gd::string& username);
         void removePeer(uint32_t id);
@@ -52,6 +51,9 @@ class NetworkManager{
         void sendLobbyState(uint32_t targetPeerID = 0); // 0 = send to all
 
         void gotKicked(std::string reason);
+
+        bool m_pendingKick = false;
+        std::string m_pendingKickReason;
     private:
         ENetHost* m_host;
         ENetPeer* m_peer;

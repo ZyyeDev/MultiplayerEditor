@@ -30,6 +30,8 @@ class SyncManager{
         bool shouldApplyUpdate(uint32_t remoteTimestamp);
         uint32_t m_lastUpdateTimestamp;
 
+        ccColor3B colorForUser(uint32_t userID);
+
         int m_objectCounter;
         uint32_t m_userID;
 

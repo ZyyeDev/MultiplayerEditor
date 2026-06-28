@@ -38,13 +38,13 @@ struct PacketHeader{
 struct KickPacket {
     PacketHeader header;
     uint32_t userToKick;
-    std::string kickReason;
+    char kickReason[128];
 };
 
 struct HandshakePacket{
     PacketHeader header;
-    gd::string username;
-    geode::VersionInfo version;
+    char username[64];
+    char version[32];
 };
 
 struct ObjectStringPacket {

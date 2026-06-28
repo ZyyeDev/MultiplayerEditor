@@ -284,16 +284,16 @@ void SyncManager::handlePacket(const uint8_t* data, size_t size) {
         case PacketType::HANDSHAKE: {
             const HandshakePacket* packet = reinterpret_cast<const HandshakePacket*>(data);
             // i think we want to do this in another way but it works for now
-            if (packet->version != Mod::get()->getVersion()){
+            std::string myVersion = Mod::get()->getVersion().toNonVString();
+            if (myVersion != packet->version){
                 if (g_isHost){
                     KickPacket _kickPacket;
                     _kickPacket.header.type = PacketType::KICK_USER;
                     _kickPacket.header.timestamp = getCurrentTimestamp();
                     _kickPacket.header.senderID = g_network->getPeerID();
-
                     _kickPacket.userToKick = packet->header.senderID;
-                    _kickPacket.kickReason = "Version Mismatch";
-
+                    strncpy(_kickPacket.kickReason, "Version Mismatch", 127);
+                    _kickPacket.kickReason[127] = '\0';
                     g_network->sendPacketToPeer(
                         packet->header.senderID,
                         &_kickPacket,
@@ -311,6 +311,10 @@ void SyncManager::handlePacket(const uint8_t* data, size_t size) {
         }
         case PacketType::KICK_USER: {
             const KickPacket* packet = reinterpret_cast<const KickPacket*>(data);
+            if (!g_isHost && packet->userToKick == g_network->getPeerID()){
+                g_network->gotKicked(packet->kickReason);
+                break;
+            }
             g_network->removePeer(packet->userToKick);
             log::info("peer left {}", packet->userToKick);
             break;
@@ -452,6 +456,21 @@ void SyncManager::onLocalCursorUpdate(CCPoint position){
     g_network->sendPacket(&packet, sizeof(packet));
 }
 
+ccColor3B SyncManager::colorForUser(uint32_t userID){
+    static const ccColor3B palette[] = {
+        {255, 80, 80},
+        {80, 160, 255},
+        {255, 200, 60},
+        {130, 255, 130},
+        {255, 120, 255},
+        {80, 255, 220},
+        {255, 160, 80},
+        {180, 140, 255},
+    };
+
+    return palette[userID % (sizeof(palette) / sizeof(palette[0]))];
+}
+
 void SyncManager::onRemoteCursorUpdate(const uint32_t& userID, int x, int y){
     CCPoint position = ccp(x, y);
 
@@ -465,6 +484,7 @@ void SyncManager::onRemoteCursorUpdate(const uint32_t& userID, int x, int y){
         
         cursor->setZOrder(INT_MAX);
         cursor->setPosition(position);
+        cursor->setColor(colorForUser(userID));
 
         auto peers = g_network->m_peersInLobby;
         auto nameIt = peers.find(userID);
@@ -476,6 +496,7 @@ void SyncManager::onRemoteCursorUpdate(const uint32_t& userID, int x, int y){
                 cursor->getContentSize().height + 6.f
             ));
             label->setZOrder(1);
+            label->setColor(colorForUser(userID));
             cursor->addChild(label);
         }
 
@@ -571,7 +592,7 @@ void SyncManager::onRemoteSelectionChanged(const uint32_t& userID){
             continue;
         }
 
-        highlight->setColor({0, 255, 255});
+        highlight->setColor(colorForUser(userID));
         highlight->setOpacity(128);
 
         CCSize objSize = obj->getContentSize();

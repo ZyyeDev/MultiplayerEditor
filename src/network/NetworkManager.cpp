@@ -69,8 +69,12 @@ bool NetworkManager::connect(const std::string& ip, uint16_t port){
         packet.header.type = PacketType::HANDSHAKE;
         packet.header.timestamp = getCurrentTimestamp();
         packet.header.senderID = getPeerID();
-        packet.username = getUsername();
-        packet.version = Mod::get()->getVersion();
+        gd::string username = getUsername();
+        strncpy(packet.username, username.c_str(), 63);
+        packet.username[63] = '\0';
+        std::string version = Mod::get()->getVersion().toNonVString();
+        strncpy(packet.version, version.c_str(), 31);
+        packet.version[31] = '\0';
         
         sendPacket(&packet, sizeof(packet));
         if (m_onConnect) m_onConnect(event.peer->connectID);
@@ -135,6 +139,29 @@ void NetworkManager::sendPacketToPeer(uint32_t peerID, const void* data, size_t 
 
 void NetworkManager::poll(){
     if (!m_host) return;
+
+    if (m_pendingKick){
+        m_pendingKick = false;
+
+        if (m_onDisconnect){
+            m_onDisconnect();
+        }
+
+        disconnect();
+
+        auto scene = CCScene::create();
+        auto menuLayer = MenuLayer::create();
+        scene->addChild(menuLayer);
+
+        CCDirector::sharedDirector()->replaceScene(CCTransitionFade::create(0.5f,scene));
+
+        FLAlertLayer::create(
+            "You Got Kicked!",
+            ("Reason: " + m_pendingKickReason).c_str(),
+            "Ok"
+        )->show();
+        return;
+    }
 
     ENetEvent event;
     while (enet_host_service(m_host, &event, 0) > 0){
@@ -258,19 +285,6 @@ void NetworkManager::sendLobbyState(uint32_t targetPeerID) {
 }
 
 void NetworkManager::gotKicked(std::string reason){
-    if (m_onDisconnect){
-        m_onDisconnect();
-    }
-
-    auto scene = CCScene::create();
-    auto menuLayer = MenuLayer::create();
-    scene->addChild(menuLayer);
-
-    CCDirector::sharedDirector()->replaceScene(CCTransitionFade::create(0.5f,scene));
-
-    FLAlertLayer::create(
-        "You Got Kicked!",
-        "Reason: " + reason,
-        "Ok"
-    );
+    m_pendingKick = true;
+    m_pendingKickReason = reason;
 }
