@@ -1,6 +1,12 @@
 #include <Geode/Geode.hpp>
 #include <Geode/modify/LevelEditorLayer.hpp>
 #include <Geode/modify/EditorUI.hpp>
+#include <Geode/modify/GJBaseGameLayer.hpp>
+
+#include <map>
+#include <string>
+#include <vector>
+#include <algorithm>
 
 #include "../sync/SyncManager.hpp"
 #include "../network/NetworkManager.hpp"
@@ -13,15 +19,34 @@ extern NetworkManager* g_network;
 extern bool g_isInSession;
 extern bool g_isHost;
 
-void objectModified(GameObject* object){
-    if (g_isInSession && g_sync && !g_sync->isApplyingRemoteChanges()){
-        g_sync->onLocalObjectModified(object);
-    }
-}
+LevelEditorLayer* m_editorUI;
 
 void settingsUpdate(){
     if (g_isInSession && g_sync && g_isHost && !g_sync->isApplyingRemoteChanges()) {
         g_sync->onLocalLevelSettingsChanged();
+    }
+}
+
+void try_add_object(auto obj){
+    if (g_isInSession && g_sync && !g_sync->isApplyingRemoteChanges()){
+        // HACK: Objects in custom objects tab are detected as objects and are being sent
+        // even tho they are part of the ui. We dont want to send these!!
+        if (m_editorUI) {
+            CCNode* parent = obj->getParent();
+            bool isUIElement = false;
+            
+            while (parent) {
+                if (parent == m_editorUI) {
+                    isUIElement = true;
+                    break;
+                }
+                parent = parent->getParent();
+            }
+            
+            if (!isUIElement) {
+                try_add_object(obj);
+            }
+        }
     }
 }
 
@@ -69,32 +94,6 @@ class $modify(MyLevelEditorLayer, LevelEditorLayer){
         LevelEditorLayer::addDelayedSpawn(p0, p1);
     }
 
-    void addSpecial(GameObject* p0) {
-        LevelEditorLayer::addSpecial(p0);
-
-        if (g_isInSession && g_sync && !g_sync->isApplyingRemoteChanges()){
-            // HACK: Objects in custom objects tab are detected as objects and are being sent
-            // even tho they are part of the ui. We dont want to send these!!
-            auto editorUI = this->m_editorUI;
-            if (editorUI) {
-                CCNode* parent = p0->getParent();
-                bool isUIElement = false;
-                
-                while (parent) {
-                    if (parent == editorUI) {
-                        isUIElement = true;
-                        break;
-                    }
-                    parent = parent->getParent();
-                }
-                
-                if (!isUIElement) {
-                    g_sync->onLocalObjectAdded(p0);
-                }
-            }
-        }
-    }
-
     void onPlaytest() {
         log::info("start playtest");
         m_fields->m_playtesting = true;
@@ -112,85 +111,186 @@ class $modify(MyLevelEditorLayer, LevelEditorLayer){
         
         LevelEditorLayer::onStopPlaytest();
     }
+
+    bool init(GJGameLevel* level, bool noUI) {
+        if (!LevelEditorLayer::init(level, noUI)) return false;
+        
+        m_editorUI = this->m_editorUI;
+
+        return true;
+    }
 };
 
-class $modify(EditorUI){
+class $modify(MyGJBaseGameLayer, GJBaseGameLayer) {
+    void addToSection(GameObject* obj) {
+        GJBaseGameLayer::addToSection(obj);
+
+        if (!obj || !g_isInSession || !g_sync || g_sync->isApplyingRemoteChanges()) return;
+
+        auto editor = LevelEditorLayer::get();
+        if (!editor || static_cast<GJBaseGameLayer*>(editor) != this) return;
+
+        if (g_sync->isTrackedObject(obj)) return;
+
+        try_add_object(obj);
+    }
+};
+
+class $modify(MyEditorUI, EditorUI) {
+    struct Fields {
+        std::map<GameObject*, std::string> m_trackedSelections;
+        float m_diffTimer = 0.f;
+        float m_lockRefreshTimer = 0.f;
+    };
+
     bool init(LevelEditorLayer* editorLayer) {
         if (!EditorUI::init(editorLayer)) return false;
+
         if (g_isInSession && !g_isHost){
             auto settingsbtn = this->getChildByID("settings-button");
             if (settingsbtn){
                 settingsbtn->setVisible(false);
             }
         }
+
+        schedule(schedule_selector(MyEditorUI::syncTick), 0.1f);
+
         return true;
     }
 
-    /* -- TRANSFORM -- */
-    void transformObjectCall(EditCommand cmd) {
-        EditorUI::transformObjectCall(cmd);
+    void syncTick(float dt) {
+        if (!g_isInSession || !g_sync || g_sync->isApplyingRemoteChanges()) return;
 
-        auto selected = this->getSelectedObjects();
-        for (auto obj : CCArrayExt<GameObject*>(selected)){
-            objectModified(obj);
+        auto editor = LevelEditorLayer::get();
+        if (!editor || !editor->m_objects) return;
+
+        auto& tracked = m_fields->m_trackedSelections;
+
+        std::vector<GameObject*> currentSelection;
+        if (m_selectedObject) currentSelection.push_back(m_selectedObject);
+        if (m_selectedObjects) {
+            for (auto obj : CCArrayExt<GameObject*>(m_selectedObjects)) {
+                if (obj) currentSelection.push_back(obj);
+            }
         }
+
+        std::vector<GameObject*> toDeselect;
+        std::vector<std::string> toLock;
+
+        for (auto obj : currentSelection) {
+            if (!editor->m_objects->containsObject(obj)) continue;
+
+            if (!g_sync->isTrackedObject(obj)) {
+                g_sync->onLocalObjectAdded(obj);
+            }
+
+            uint32_t lockOwner = 0;
+            if (g_sync->isObjectLockedByOther(obj, &lockOwner)) {
+                toDeselect.push_back(obj);
+                continue;
+            }
+
+            if (tracked.find(obj) == tracked.end()) {
+                gd::string gs = obj->getSaveString(editor);
+                tracked[obj] = std::string(gs);
+                toLock.push_back(g_sync->getObjectUid(obj));
+            }
+        }
+
+        for (auto obj : toDeselect) {
+            deselectObject(obj);
+            if (m_selectedObject == obj) m_selectedObject = nullptr;
+            if (m_selectedObjects && m_selectedObjects->containsObject(obj)) {
+                m_selectedObjects->removeObject(obj);
+            }
+        }
+
+        if (!toLock.empty()) {
+            g_sync->onLocalSelectionChanged(this->getSelectedObjects());
+        }
+
+        m_fields->m_lockRefreshTimer += dt;
+        if (m_fields->m_lockRefreshTimer >= 1.0f) {
+            m_fields->m_lockRefreshTimer = 0.f;
+            if (!tracked.empty()) {
+                g_sync->onLocalSelectionChanged(this->getSelectedObjects());
+            }
+        }
+
+        std::vector<std::string> updates;
+        for (auto it = tracked.begin(); it != tracked.end(); ) {
+            GameObject* obj = it->first;
+
+            if (!editor->m_objects->containsObject(obj)) {
+                it = tracked.erase(it);
+                continue;
+            }
+
+            bool stillSelected = std::find(currentSelection.begin(), currentSelection.end(), obj) != currentSelection.end()
+                && std::find(toDeselect.begin(), toDeselect.end(), obj) == toDeselect.end();
+
+            gd::string gs = obj->getSaveString(editor);
+            std::string current = std::string(gs);
+
+            if (!stillSelected) {
+                if (current != it->second) {
+                    if (obj->m_objectID != 31) {
+                        g_sync->onLocalObjectModified(obj);
+                    }
+                }
+                it = tracked.erase(it);
+            } else {
+                if (current != it->second) {
+                    if (obj->m_objectID != 31) {
+                        g_sync->onLocalObjectModified(obj);
+                    }
+                    it->second = current;
+                }
+                ++it;
+            }
+        }
+
+        g_sync->updateLocks(dt);
     }
 
-    void scaleObjects(CCArray* p0, float p1, float p2, CCPoint p3, ObjectScaleType p4, bool p5) {
-        EditorUI::scaleObjects(p0, p1, p2, p3, p4, p5);
-        for (auto obj : CCArrayExt<GameObject*>(p0)){
-            objectModified(obj);
+    void moveObject(GameObject* object, CCPoint offset) {
+        if (g_isInSession && g_sync && object) {
+            if (g_sync->isObjectLockedByOther(object)) return;
         }
+        EditorUI::moveObject(object, offset);
     }
 
-    void rotateObjects(CCArray* p0, float p1, CCPoint p2) {
-        EditorUI::rotateObjects(p0, p1, p2);
-        for (auto obj : CCArrayExt<GameObject*>(p0)){
-            objectModified(obj);
-        }
-    }
-
-    /* -- delete --*/
     void onDeleteSelected(CCObject* sender) {
         if (g_isInSession && g_sync){
             auto selected = this->getSelectedObjects();
+            auto allowed = CCArray::create();
+            bool anyLocked = false;
+            uint32_t lockedBy = 0;
+
             for (auto obj : CCArrayExt<GameObject*>(selected)){
+                if (g_sync->isObjectLockedByOther(obj, &lockedBy)){
+                    anyLocked = true;
+                    continue;
+                }
+                allowed->addObject(obj);
                 if (g_sync->isTrackedObject(obj)) {
                     g_sync->onLocalObjectDestroyed(obj);
                 }
             }
+
+            if (anyLocked){
+                auto peers = g_network->m_peersInLobby;
+                auto nameIt = peers.find(lockedBy);
+                std::string name = nameIt != peers.end() ? nameIt->second.c_str() : "someone else";
+                std::string msg = "Can't delete, " + name + " is editing that";
+                Notification::create(msg.c_str(), NotificationIcon::Warning, 1.0f)->show();
+            }
+
+            this->selectObjects(allowed, false);
         }
 
         EditorUI::onDeleteSelected(sender);
     }
-
-    void onDuplicate(CCObject* sender) {
-        EditorUI::onDuplicate(sender);
-
-        if (g_isInSession && g_sync && !g_sync->isApplyingRemoteChanges()){
-            auto selected = this->getSelectedObjects();
-            for (auto obj : CCArrayExt<GameObject*>(selected)){
-                if (!g_sync->isTrackedObject(obj)) {
-                    g_sync->onLocalObjectAdded(obj);
-                }
-            }
-        }
-    }
-
-    /*
-    void pasteObjects(gd::string p0) {
-        EditorUI::pasteObjects(p0);
-
-        if (g_isInSession && g_sync && !g_sync->isApplyingRemoteChanges()){
-            auto selected = this->getSelectedObjects();
-            for (auto obj : CCArrayExt<GameObject*>(selected)){
-                if (!g_sync->isTrackedObject(obj)) {
-                    g_sync->onLocalObjectAdded(obj);
-                }
-            }
-        }
-    }
-    */
 
     void ccTouchMoved(CCTouch* touch, CCEvent* event) {
         EditorUI::ccTouchMoved(touch, event);
@@ -210,18 +310,6 @@ class $modify(EditorUI){
         }
     }
 
-    void ccTouchEnded(CCTouch* touch, CCEvent* event) {
-        EditorUI::ccTouchEnded(touch, event);
-
-        if (g_isInSession && g_sync && !g_sync->isApplyingRemoteChanges()){
-            auto selected = this->getSelectedObjects();
-            for (auto obj : CCArrayExt<GameObject*>(selected)){
-                objectModified(obj);
-            }
-        }
-    }
-
-    // possible settings modified
     void selectBuildTab(int p0) {
         EditorUI::selectBuildTab(p0);
         
@@ -247,42 +335,16 @@ class $modify(EditorUI){
     }
 
     void selectObjects(CCArray* objects, bool idk) {
-        if (g_isInSession && g_sync && objects){
-            auto filtered = CCArray::create();
-            uint32_t lockedBy = 0;
-            bool anyLocked = false;
-
-            for (auto obj : CCArrayExt<GameObject*>(objects)){
-                if (g_sync->isObjectLockedByOther(obj, &lockedBy)){
-                    anyLocked = true;
-                } else {
-                    filtered->addObject(obj);
-                }
-            }
-
-            if (anyLocked){
-                auto peers = g_network->m_peersInLobby;
-                auto nameIt = peers.find(lockedBy);
-                std::string name = nameIt != peers.end() ? nameIt->second.c_str() : "someone else";
-                std::string msg = name + " is already editing that";
-                Notification::create(msg.c_str(), NotificationIcon::Warning, 1.0f)->show();
-            }
-
-            objects = filtered;
-        }
-
         EditorUI::selectObjects(objects, idk);
-        
-        if (g_isInSession && g_sync && !g_sync->isApplyingRemoteChanges()){
-            g_sync->onLocalSelectionChanged(objects);
-        }
     }
 
     void deselectAll() {
-        if (g_isInSession && g_sync && !g_sync->isApplyingRemoteChanges()){
+        auto& tracked = m_fields->m_trackedSelections;
+        if (g_isInSession && g_sync && !g_sync->isApplyingRemoteChanges() && !tracked.empty()){
             auto emptyArray = CCArray::create();
             g_sync->onLocalSelectionChanged(emptyArray);
         }
+        tracked.clear();
         
         EditorUI::deselectAll();
     }

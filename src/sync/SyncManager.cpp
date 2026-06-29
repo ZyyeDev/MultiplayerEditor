@@ -182,7 +182,9 @@ void SyncManager::onRemoteObjectDestroyed(const ObjectDeletePacket& packet) {
     untrackObject(packet.uid);
     
     m_applyingRemoteChanges = true;
-    editor->removeObject(obj, false);
+    if (editor->m_objects && editor->m_objects->containsObject(obj)) {
+        editor->removeObject(obj, false);
+    }
     m_applyingRemoteChanges = false;
 }
 
@@ -206,7 +208,9 @@ void SyncManager::onRemoteObjectModified(const ObjectStringPacket& packet) {
     MouseTooltip::get()->unregisterRegion(oldObj);
 
     m_localObjects.erase(oldObj);
-    editor->removeObject(oldObj, false);
+    if (editor->m_objects->containsObject(oldObj)) {
+        editor->removeObject(oldObj, false);
+    }
     untrackObject(uid);
     
     std::string objString(packet.objectString, packet.stringLength);
@@ -398,21 +402,15 @@ void SyncManager::handlePacket(const uint8_t* data, size_t size) {
         case PacketType::SELECT_CHANGE: {
             const SelectPacket* packet = reinterpret_cast<const SelectPacket*>(data);
             
-            std::vector<std::string> uids;
-            for (uint32_t i = 0; i < packet->countInChunk; i++) {
-                uids.push_back(std::string(packet->uids[i]));
-            }
-            
-            // if this is the first chunk clear previous
             if (packet->chunkIndex == 0) {
                 m_remoteSelections[packet->header.senderID].clear();
             }
             
-            for (const auto& uid : uids) {
-                m_remoteSelections[packet->header.senderID].push_back(uid);
+            for (uint32_t i = 0; i < packet->countInChunk; i++) {
+                std::string uid(packet->uids[i]);
+                m_remoteSelections[packet->header.senderID][uid] = 3.0f;
             }
             
-            // update highlights if no more packets coming
             if (!packet->hasMore) {
                 onRemoteSelectionChanged(packet->header.senderID);
             }
@@ -528,15 +526,27 @@ bool SyncManager::isObjectLockedByOther(GameObject* obj, uint32_t* outUserID){
     for (auto& [userId, selection] : m_remoteSelections){
         if (userId == myID) continue;
 
-        for (auto& selectedUid : selection){
-            if (selectedUid == uid){
-                if (outUserID) *outUserID = userId;
-                return true;
-            }
+        auto it = selection.find(uid);
+        if (it != selection.end() && it->second > 0.f){
+            if (outUserID) *outUserID = userId;
+            return true;
         }
     }
 
     return false;
+}
+
+void SyncManager::updateLocks(float dt){
+    for (auto& [userId, selection] : m_remoteSelections){
+        std::vector<std::string> expired;
+        for (auto& [uid, ttl] : selection){
+            ttl -= dt;
+            if (ttl <= 0.f) expired.push_back(uid);
+        }
+        bool changed = !expired.empty();
+        for (auto& uid : expired) selection.erase(uid);
+        if (changed) onRemoteSelectionChanged(userId);
+    }
 }
 
 void SyncManager::onLocalSelectionChanged(CCArray* selectedObjects){
@@ -617,7 +627,8 @@ void SyncManager::onRemoteSelectionChanged(const uint32_t& userID){
     auto nameIt = peers.find(userID);
     std::string username = nameIt != peers.end() ? nameIt->second.c_str() : "someone";
 
-    for (const std::string& uid : selection){
+    for (const auto& [uid, ttl] : selection){
+        if (ttl <= 0.f) continue;
         auto it = m_syncedObjects.find(uid);
         if (it == m_syncedObjects.end()) continue;
 
@@ -751,7 +762,7 @@ void SyncManager::syncAfterUndoRedo() {
         untrackObject(uid);
 
         for (auto& [userId, selection] : m_remoteSelections) {
-            selection.erase(std::remove(selection.begin(), selection.end(), uid), selection.end());
+            selection.erase(uid);
         }
     }
 

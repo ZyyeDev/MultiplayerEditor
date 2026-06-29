@@ -41,9 +41,9 @@ class SyncManager{
         std::unordered_set<GameObject*> m_localObjects;
 
         /* -- SELECTION -- */
-        std::map<uint32_t, std::vector<CCSprite*>> m_remoteSelectionHighlights;
-        std::map<uint32_t, std::vector<std::string>> m_remoteSelections;
         std::map<uint32_t, CCSprite*> m_remoteCursors;
+        std::map<uint32_t, std::vector<CCSprite*>> m_remoteSelectionHighlights;
+        std::map<uint32_t, std::map<std::string, float>> m_remoteSelections;
         CCPoint m_CursorPos;
         CCArray* m_Selection;
 
@@ -68,6 +68,7 @@ class SyncManager{
         void onLocalCursorUpdate(CCPoint position);
         void onLocalSelectionChanged(CCArray* selectedObjects);
         bool isObjectLockedByOther(GameObject* obj, uint32_t* outUserID = nullptr);
+        void updateLocks(float dt);
 
         // level settings
         void onLocalLevelSettingsChanged();

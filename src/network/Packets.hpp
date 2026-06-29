@@ -51,7 +51,7 @@ struct ObjectStringPacket {
     PacketHeader header;
     char uid[32];
     uint32_t stringLength;
-    char objectString[4096];
+    char objectString[8192];
 };
 
 struct ObjectDeletePacket{
