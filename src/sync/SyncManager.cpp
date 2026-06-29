@@ -3,6 +3,7 @@
 #include "SyncManager.hpp"
 #include "../network/NetworkManager.hpp"
 #include "../network/Packets.hpp"
+#include "../utils/MouseTooltip.hpp"
 
 extern NetworkManager* g_network;
 extern bool g_isHost;
@@ -86,6 +87,7 @@ void SyncManager::onLocalObjectDestroyed(GameObject* obj) {
             return sprite && sprite->getParent() == obj;
         }), highlights.end());
     }
+    MouseTooltip::get()->unregisterRegion(obj);
 
     ObjectDeletePacket packet;
     packet.header.type = PacketType::OBJECT_DELETE;
@@ -168,6 +170,7 @@ void SyncManager::onRemoteObjectDestroyed(const ObjectDeletePacket& packet) {
             return sprite && sprite->getParent() == obj;
         }), highlights.end());
     }
+    MouseTooltip::get()->unregisterRegion(obj);
 
     // no crashes (i hope)
     if (m_localObjects.count(obj)) {
@@ -200,6 +203,7 @@ void SyncManager::onRemoteObjectModified(const ObjectStringPacket& packet) {
             return sprite && sprite->getParent() == oldObj;
         }), highlights.end());
     }
+    MouseTooltip::get()->unregisterRegion(oldObj);
 
     m_localObjects.erase(oldObj);
     editor->removeObject(oldObj, false);
@@ -316,6 +320,10 @@ void SyncManager::handlePacket(const uint8_t* data, size_t size) {
                 break;
             }
             g_network->removePeer(packet->userToKick);
+            m_remoteSelections[packet->userToKick].clear();
+            onRemoteSelectionChanged(packet->userToKick);
+            m_remoteSelections.erase(packet->userToKick);
+            m_remoteSelectionHighlights.erase(packet->userToKick);
             log::info("peer left {}", packet->userToKick);
             break;
         }
@@ -328,6 +336,10 @@ void SyncManager::handlePacket(const uint8_t* data, size_t size) {
         case PacketType::PEER_LEFT: {
             const PeerLeftPacket* packet = reinterpret_cast<const PeerLeftPacket*>(data);
             g_network->removePeer(packet->peerID);
+            m_remoteSelections[packet->peerID].clear();
+            onRemoteSelectionChanged(packet->peerID);
+            m_remoteSelections.erase(packet->peerID);
+            m_remoteSelectionHighlights.erase(packet->peerID);
             log::info("peer left {}", packet->peerID);
             break;
         }
@@ -507,6 +519,26 @@ void SyncManager::onRemoteCursorUpdate(const uint32_t& userID, int x, int y){
     }
 }
 
+bool SyncManager::isObjectLockedByOther(GameObject* obj, uint32_t* outUserID){
+    if (!isTrackedObject(obj)) return false;
+
+    std::string uid = getObjectUid(obj);
+    uint32_t myID = g_network->getPeerID();
+
+    for (auto& [userId, selection] : m_remoteSelections){
+        if (userId == myID) continue;
+
+        for (auto& selectedUid : selection){
+            if (selectedUid == uid){
+                if (outUserID) *outUserID = userId;
+                return true;
+            }
+        }
+    }
+
+    return false;
+}
+
 void SyncManager::onLocalSelectionChanged(CCArray* selectedObjects){
     if (!selectedObjects){
         log::error("selected objects is null!!");
@@ -569,6 +601,7 @@ void SyncManager::onRemoteSelectionChanged(const uint32_t& userID){
         auto& highlights = m_remoteSelectionHighlights[userID];
         for (auto sprite : highlights){
             if (sprite){
+                MouseTooltip::get()->unregisterRegion(sprite->getParent());
                 sprite->removeFromParent();
             }
         }
@@ -580,6 +613,9 @@ void SyncManager::onRemoteSelectionChanged(const uint32_t& userID){
     if (!editor->m_objectLayer) return;
 
     auto& selection = m_remoteSelections[userID];
+    auto peers = g_network->m_peersInLobby;
+    auto nameIt = peers.find(userID);
+    std::string username = nameIt != peers.end() ? nameIt->second.c_str() : "someone";
 
     for (const std::string& uid : selection){
         auto it = m_syncedObjects.find(uid);
@@ -608,6 +644,8 @@ void SyncManager::onRemoteSelectionChanged(const uint32_t& userID){
         
         obj->addChild(highlight);
         m_remoteSelectionHighlights[userID].push_back(highlight);
+
+        MouseTooltip::get()->registerRegion(obj, username + " is editing this", colorForUser(userID));
     }
 }
 
@@ -898,4 +936,29 @@ void SyncManager::cleanUpPlayers() {
     }
     m_remotePlayers.clear();
     m_lastPlayerSendTime = 0.0f;
+}
+
+void SyncManager::clearAllRemoteState() {
+    for (auto& [userId, highlights] : m_remoteSelectionHighlights) {
+        for (auto sprite : highlights){
+            if (sprite){
+                MouseTooltip::get()->unregisterRegion(sprite->getParent());
+                sprite->removeFromParent();
+            }
+        }
+    }
+    m_remoteSelectionHighlights.clear();
+    m_remoteSelections.clear();
+
+    for (auto& [userId, cursor] : m_remoteCursors) {
+        if (cursor && cursor->getParent()){
+            cursor->removeFromParent();
+        }
+    }
+    m_remoteCursors.clear();
+
+    m_syncedObjects.clear();
+    m_localObjects.clear();
+
+    MouseTooltip::get()->clear();
 }

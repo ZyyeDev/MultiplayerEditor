@@ -6,6 +6,7 @@
 
 #include "network/NetworkManager.hpp"
 #include "sync/SyncManager.hpp"
+#include "utils/MouseTooltip.hpp"
 
 using namespace geode::prelude;
 
@@ -43,6 +44,7 @@ $on_mod(Loaded){
             
             if (g_sync) {
                 g_sync->cleanUpPlayers();
+                g_sync->clearAllRemoteState();
             }
             
             log::warn("lost connection to host");
@@ -56,6 +58,7 @@ $on_mod(Loaded){
 class $modify(CCScheduler) {
     void update(float dt) {
         CCScheduler::update(dt);
+        MouseTooltip::get()->update();
         
         if (g_isInSession && g_network) {
             g_network->poll();

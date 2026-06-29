@@ -247,6 +247,30 @@ class $modify(EditorUI){
     }
 
     void selectObjects(CCArray* objects, bool idk) {
+        if (g_isInSession && g_sync && objects){
+            auto filtered = CCArray::create();
+            uint32_t lockedBy = 0;
+            bool anyLocked = false;
+
+            for (auto obj : CCArrayExt<GameObject*>(objects)){
+                if (g_sync->isObjectLockedByOther(obj, &lockedBy)){
+                    anyLocked = true;
+                } else {
+                    filtered->addObject(obj);
+                }
+            }
+
+            if (anyLocked){
+                auto peers = g_network->m_peersInLobby;
+                auto nameIt = peers.find(lockedBy);
+                std::string name = nameIt != peers.end() ? nameIt->second.c_str() : "someone else";
+                std::string msg = name + " is already editing that";
+                Notification::create(msg.c_str(), NotificationIcon::Warning, 1.0f)->show();
+            }
+
+            objects = filtered;
+        }
+
         EditorUI::selectObjects(objects, idk);
         
         if (g_isInSession && g_sync && !g_sync->isApplyingRemoteChanges()){

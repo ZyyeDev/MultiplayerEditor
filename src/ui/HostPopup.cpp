@@ -82,6 +82,18 @@ bool HostPopup::init(){
 void HostPopup::onStartHost(CCObject*){
     if (g_isHost && g_isInSession){
         g_network->stopHosting();
+        g_isHost = false;
+        g_isInSession = false;
+
+        if (g_sync){
+            g_sync->cleanUpPlayers();
+            g_sync->clearAllRemoteState();
+        }
+
+        if (hostBtn){
+            hostBtn->setSprite(ButtonSprite::create("Host", "goldFont.fnt", "GJ_button_01.png", .8f));
+        }
+
         FLAlertLayer::create(
             "Stopped Hosting!",
             "You are no longer hosting!",

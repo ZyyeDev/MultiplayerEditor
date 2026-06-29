@@ -67,6 +67,7 @@ class SyncManager{
         // selection stuff
         void onLocalCursorUpdate(CCPoint position);
         void onLocalSelectionChanged(CCArray* selectedObjects);
+        bool isObjectLockedByOther(GameObject* obj, uint32_t* outUserID = nullptr);
 
         // level settings
         void onLocalLevelSettingsChanged();
@@ -112,6 +113,7 @@ class SyncManager{
         std::string getObjectUid(GameObject* obj);
 
         void cleanUpPlayers();
+        void clearAllRemoteState();
 
         uint32_t getUserID() { return SyncManager::m_userID; }
 };
