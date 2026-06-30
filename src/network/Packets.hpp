@@ -78,7 +78,6 @@ struct LevelSettingsPacket {
     int audioTrack;
     int songID;
     int levelLength;
-    std::string saveString;
     char settingsString[8192];
 };
 

@@ -662,11 +662,9 @@ void SyncManager::onRemoteSelectionChanged(const uint32_t& userID){
 
 std::string SyncManager::extractSettingsString() {
     auto editor = getEditorLayer();
-    if (!editor) return "";
-    gd::string gs = editor->getLevelString();
-    std::string s(gs);
-    size_t sep = s.find(';');
-    return sep != std::string::npos ? s.substr(0, sep) : s;
+    if (!editor || !editor->m_levelSettings) return "";
+    gd::string gs = editor->m_levelSettings->getSaveString();
+    return std::string(gs);
 }
 
 void SyncManager::onRemoteLevelSettingsChanged(const LevelSettingsPacket& packet) {
@@ -681,8 +679,10 @@ void SyncManager::applyLevelSettings(const LevelSettingsPacket& settings) {
 
     m_applyingRemoteChanges = true;
 
-    if (!settings.saveString.empty() && editor->m_levelSettings) {
-        auto* newSettings = LevelSettingsObject::objectFromString(settings.saveString);
+    std::string saveStr(settings.settingsString, settings.settingsLength);
+
+    if (!saveStr.empty() && editor->m_levelSettings) {
+        auto* newSettings = LevelSettingsObject::objectFromString(saveStr);
         if (newSettings) {
             editor->m_levelSettings->m_startMode = newSettings->m_startMode;
             editor->m_levelSettings->m_startSpeed = newSettings->m_startSpeed;

@@ -7,6 +7,7 @@
 #include <string>
 #include <vector>
 #include <algorithm>
+#include <cstring>
 
 #include "../sync/SyncManager.hpp"
 #include "../network/NetworkManager.hpp"
@@ -71,9 +72,22 @@ class $modify(MyLevelEditorLayer, LevelEditorLayer){
 
         if (g_isInSession && g_isHost && g_network) {
             LevelSettingsPacket settings;
+            settings.header.type = PacketType::LEVEL_SETTINGS;
+            settings.header.timestamp = getCurrentTimestamp();
+            settings.header.senderID = g_network->getPeerID();
+
+            settings.settingsLength = 0;
             if (this->m_levelSettings) {
-                settings.saveString = this->m_levelSettings->getSaveString();
+                gd::string gs = this->m_levelSettings->getSaveString();
+                std::string saveStr(gs);
+                settings.settingsLength = (uint32_t)std::min(saveStr.size(), sizeof(settings.settingsString) - 1);
+                strncpy(settings.settingsString, saveStr.c_str(), settings.settingsLength);
+                settings.settingsString[settings.settingsLength] = '\0';
             }
+
+            settings.audioTrack = 0;
+            settings.songID = 0;
+            settings.levelLength = 0;
             if (this->m_level) {
                 settings.audioTrack = this->m_level->m_audioTrack;
                 settings.songID = this->m_level->m_songID;
