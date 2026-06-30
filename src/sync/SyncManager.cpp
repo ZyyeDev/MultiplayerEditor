@@ -411,6 +411,11 @@ void SyncManager::handlePacket(const uint8_t* data, size_t size) {
             onRemoteCursorUpdate(packet->header.senderID, packet->x, packet->y);
             break;
         }
+        case PacketType::COLOR_SYNC: {
+            const ColorChannelsPacket* packet = reinterpret_cast<const ColorChannelsPacket*>(data);
+            restoreColorChannels(getEditorLayer(), packet->colorDat);
+            break;
+        }
         case PacketType::SELECT_CHANGE: {
             const SelectPacket* packet = reinterpret_cast<const SelectPacket*>(data);
             
@@ -1001,4 +1006,47 @@ void SyncManager::clearAllRemoteState() {
     m_localObjects.clear();
 
     MouseTooltip::get()->clear();
+}
+
+std::vector<SavedColorData> SyncManager::saveAllColorChannels(LevelEditorLayer* editorLayer) {
+    std::vector<SavedColorData> savedColors;
+    if (!editorLayer || !editorLayer->m_effectManager) return savedColors;
+
+    auto effectManager = editorLayer->m_effectManager;
+
+    for (ColorActionSprite* action : effectManager->m_colorActionSpriteVector) {
+        if (!action || action->m_colorID <= 0) continue;
+
+        ColorAction* colorAction = action->m_colorAction;
+        if (!colorAction) continue;
+
+        SavedColorData data;
+        data.colorID = action->m_colorID;
+        data.color = colorAction->m_color;
+        data.blending = colorAction->m_blending;
+        data.opacity = colorAction->m_currentOpacity;
+        data.copyID = colorAction->m_copyID;
+
+        savedColors.push_back(data);
+    }
+
+    return savedColors;
+}
+
+void SyncManager::restoreColorChannels(LevelEditorLayer* editorLayer, const std::vector<SavedColorData>& savedColors) {
+    if (!editorLayer || !editorLayer->m_effectManager) return;
+
+    auto effectManager = editorLayer->m_effectManager;
+
+    for (const auto& data : savedColors) {
+        ColorAction* colorAction = effectManager->getColorAction(data.colorID);
+        if (!colorAction) continue;
+
+        colorAction->m_color = data.color;
+        colorAction->m_blending = data.blending;
+        colorAction->m_currentOpacity = data.opacity;
+        colorAction->m_copyID = data.copyID;
+
+        effectManager->updateColorAction(colorAction);
+    }
 }

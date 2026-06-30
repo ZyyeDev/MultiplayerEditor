@@ -112,6 +112,7 @@ void JoinPopup::OnJoin(CCObject*){
         // go to editor
         auto level = GJGameLevel::create();
         level->m_levelName = "Collab Session";
+        level->m_dontSave = true;
 
         auto scene = CCScene::create();
         auto editorLayer = LevelEditorLayer::create(level, false);

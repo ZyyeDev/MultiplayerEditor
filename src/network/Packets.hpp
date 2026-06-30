@@ -9,6 +9,14 @@
 
 const int maxPlayers = 128;
 
+struct SavedColorData {
+    int colorID;
+    cocos2d::ccColor3B color;
+    bool blending;
+    float opacity;
+    int copyID;
+};
+
 enum class PacketType : uint8_t {
     HANDSHAKE = 0,
     FULL_SYNC = 1,
@@ -25,6 +33,7 @@ enum class PacketType : uint8_t {
     FULL_SYNC_REQUEST = 12,
     FULL_SYNC_END = 13,
     KICK_USER = 14,
+    COLOR_SYNC = 15,
 };
 
 #pragma pack(push, 1)
@@ -71,6 +80,10 @@ struct MousePacket{
     int y;
 };
 
+struct ColorChannelsPacket{
+    PacketHeader header;
+    std::vector<SavedColorData> colorDat;
+};
 
 struct LevelSettingsPacket {
     PacketHeader header;

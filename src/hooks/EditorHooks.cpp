@@ -3,6 +3,7 @@
 #include <Geode/modify/EditorUI.hpp>
 #include <Geode/modify/GJBaseGameLayer.hpp>
 #include <Geode/modify/CCScheduler.hpp>
+#include <Geode/modify/GJEffectManager.hpp>
 
 #include <map>
 #include <string>
@@ -278,6 +279,18 @@ class $modify(MyEditorUI, EditorUI) {
             }
         }
 
+        /*if (g_isInSession && g_network && g_sync){
+            ColorChannelsPacket colorPacket;
+
+            colorPacket.header.type = PacketType::LEVEL_SETTINGS;
+            colorPacket.header.timestamp = getCurrentTimestamp();
+            colorPacket.header.senderID = g_network->getPeerID();
+
+            colorPacket.colorDat = g_sync->saveAllColorChannels(g_sync->getEditorLayer());
+                
+            g_network->sendPacket(&colorPacket, sizeof(colorPacket));
+        }*/
+
         g_sync->updateLocks(dt);
     }
 
@@ -376,22 +389,4 @@ class $modify(MyEditorUI, EditorUI) {
         
         EditorUI::deselectAll();
     }
-
-    /*
-    void onUndoButton(CCObject* sender) {
-        EditorUI::onUndoButton(sender);
-
-        if (g_isInSession && g_sync && !g_sync->isApplyingRemoteChanges()){
-            g_sync->syncAfterUndoRedo();
-        }
-    }
-
-    void onRedoButton(CCObject* sender) {
-        EditorUI::onRedoButton(sender);
-
-        if (g_isInSession && g_sync && !g_sync->isApplyingRemoteChanges()){
-            g_sync->syncAfterUndoRedo();
-        }
-    }
-    */
 };

@@ -118,4 +118,7 @@ class SyncManager{
         void clearAllRemoteState();
 
         uint32_t getUserID() { return SyncManager::m_userID; }
+        
+        std::vector<SavedColorData> saveAllColorChannels(LevelEditorLayer* editorLayer);
+        void restoreColorChannels(LevelEditorLayer* editorLayer, const std::vector<SavedColorData>& savedColors);
 };
