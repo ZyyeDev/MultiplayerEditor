@@ -717,14 +717,10 @@ void SyncManager::applyLevelSettings(const LevelSettingsPacket& settings) {
 
         if (songChanged) {
             if (settings.songID > 0) {
-                if (MusicDownloadManager::sharedState()->isSongDownloaded(settings.songID)) {
-                    //GameManager::get()->fadeInMusic(editor->m_level->getAudioFileName());
-                } else {
+                if (!MusicDownloadManager::sharedState()->isSongDownloaded(settings.songID)) {
                     geode::Notification::create("Downloading song", geode::NotificationIcon::Info)->show();
                     MusicDownloadManager::sharedState()->downloadCustomSong(settings.songID);
                 }
-            } else {
-                //GameManager::get()->fadeInMusic(editor->m_level->getAudioFileName());
             }
         }
     }
