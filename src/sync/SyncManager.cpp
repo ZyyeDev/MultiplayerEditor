@@ -679,6 +679,8 @@ void SyncManager::applyLevelSettings(const LevelSettingsPacket& settings) {
     auto editor = getEditorLayer();
     if (!editor) return;
 
+    m_applyingRemoteChanges = true;
+
     if (!settings.saveString.empty() && editor->m_levelSettings) {
         auto* newSettings = LevelSettingsObject::objectFromString(settings.saveString);
         if (newSettings) {
@@ -714,6 +716,10 @@ void SyncManager::applyLevelSettings(const LevelSettingsPacket& settings) {
             }
         }
     }
+
+    editor->levelSettingsUpdated();
+
+    m_applyingRemoteChanges = false;
 }
 
 void SyncManager::onLocalLevelSettingsChanged() {
