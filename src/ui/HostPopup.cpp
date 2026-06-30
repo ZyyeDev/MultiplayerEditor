@@ -29,7 +29,7 @@ bool HostPopup::init(){
     infoLabel->setScale(.4f);
     infoLabel->setPosition(ccp(
         winSize.width/2,
-        winSize.height/2 + 40
+        winSize.height/2 + 20
     ));
     this->m_mainLayer->addChild(infoLabel);
 
@@ -38,13 +38,24 @@ bool HostPopup::init(){
     m_ipLabel->setScale(.6f);
     m_ipLabel->setPosition(ccp(
         winSize.width/2,
-        winSize.height/2 + 60
+        winSize.height/2 + 65
     ));
     this->m_mainLayer->addChild(m_ipLabel);
+
+    // help label
+    m_helpLabel = CCLabelBMFont::create("Give your hamachi or public ip, NOT THE LOCAL ONE (above)","goldFont.fnt");
+    m_helpLabel->setScale(.4f);
+    m_helpLabel->setPosition(ccp(
+        winSize.width/2,
+        winSize.height/2 + 45
+    ));
+    m_helpLabel->setVisible(false);
+    this->m_mainLayer->addChild(m_helpLabel);
     
     if (g_isHost && g_isInSession){
         std::string ipStr = "127.0.0.1:" + std::to_string(g_network->m_port);
         m_ipLabel->setString(ipStr.c_str());
+        m_helpLabel->setVisible(true);
     }
 
     // port input
@@ -53,7 +64,7 @@ bool HostPopup::init(){
     m_portInput->setString(std::to_string(g_network->m_port));
     m_portInput->setPosition(ccp(
         winSize.width/2,
-        winSize.height/2 + 10
+        winSize.height/2 - 10
     ));
     this->m_mainLayer->addChild(m_portInput);
 
@@ -65,7 +76,7 @@ bool HostPopup::init(){
     );
     hostBtn->setPosition(ccp(
         winSize.width/2,
-        winSize.height/2-20
+        winSize.height/2-40
     ));
     if (g_isHost && g_isInSession){
         hostBtn->setSprite(ButtonSprite::create("Stop Hosting", "goldFont.fnt", "GJ_button_01.png", .8f));
@@ -128,6 +139,7 @@ void HostPopup::onStartHost(CCObject*){
         // it should show local ip, or hamachi ip (or whatever the user is using)
         std::string ipStr = "127.0.0.1:" + std::to_string(port);
         m_ipLabel->setString(ipStr.c_str());
+        m_helpLabel->setVisible(true);
 
         g_sync->trackExistingObjects();
         

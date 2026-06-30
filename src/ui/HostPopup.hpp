@@ -7,6 +7,7 @@ using namespace geode::prelude;
 class HostPopup : public Popup{
     protected:
         CCLabelBMFont* m_ipLabel;
+        CCLabelBMFont* m_helpLabel;
         CCMenuItemSpriteExtra* hostBtn;
         TextInput* m_portInput;
         
