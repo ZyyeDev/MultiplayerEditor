@@ -43,7 +43,8 @@ bool HostPopup::init(){
     this->m_mainLayer->addChild(m_ipLabel);
     
     if (g_isHost && g_isInSession){
-        m_ipLabel->setString(std::format("127.0.0.1:{}", g_network->m_port).c_str());
+        std::string ipStr = "127.0.0.1:" + std::to_string(g_network->m_port);
+        m_ipLabel->setString(ipStr.c_str());
     }
 
     // port input
@@ -125,7 +126,8 @@ void HostPopup::onStartHost(CCObject*){
 
         // for now, just show local ip
         // it should show local ip, or hamachi ip (or whatever the user is using)
-        m_ipLabel->setString(std::format("127.0.0.1:{}", port).c_str());
+        std::string ipStr = "127.0.0.1:" + std::to_string(port);
+        m_ipLabel->setString(ipStr.c_str());
 
         g_sync->trackExistingObjects();
         

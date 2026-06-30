@@ -33,7 +33,7 @@ if(WIN32)
     target_link_libraries(enet PUBLIC ws2_32 winmm ws2_32)
     target_compile_definitions(enet PUBLIC -DHAS_SOCKLEN_T)
 else()
-    target_compile_definitions(enet PRIVATE HAS_FCNTL HAS_POLL HAS_GETHOSTBYNAME HAS_GETHOSTBYADDR)
+    target_compile_definitions(enet PRIVATE HAS_FCNTL HAS_POLL HAS_GETHOSTBYNAME HAS_GETHOSTBYADDR HAS_SOCKLEN_T)
 endif()
 
 if(MSVC)

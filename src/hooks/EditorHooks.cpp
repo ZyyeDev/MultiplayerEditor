@@ -100,17 +100,6 @@ class $modify(MyLevelEditorLayer, LevelEditorLayer){
     }
         */
 
-    /* -- add obj -- */
-    void addKeyframe(KeyframeGameObject* p0) {
-        // todo
-        LevelEditorLayer::addKeyframe(p0);
-    }
-
-    void addDelayedSpawn(EffectGameObject* p0, float p1) {
-        // todo
-        LevelEditorLayer::addDelayedSpawn(p0, p1);
-    }
-
     void onPlaytest() {
         log::info("start playtest");
         m_fields->m_playtesting = true;
