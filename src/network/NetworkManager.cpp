@@ -62,7 +62,7 @@ bool NetworkManager::connect(const std::string& ip, uint16_t port){
 
     ENetEvent event;
     if (enet_host_service(m_host, &event, 5000) > 0 && event.type == ENET_EVENT_TYPE_CONNECT){
-        log::info("connected to {}:{}!",ip,port);
+        log::info("connected to {}:{}! my connectID is {}, getPeerID() says {}", ip, port, event.peer->connectID, getPeerID());
         m_port = port;
         m_isHost = false;
         HandshakePacket packet;
@@ -77,6 +77,7 @@ bool NetworkManager::connect(const std::string& ip, uint16_t port){
         packet.version[31] = '\0';
         
         sendPacket(&packet, sizeof(packet));
+        log::info("sent handshake with senderID {}", packet.header.senderID);
         if (m_onConnect) m_onConnect(event.peer->connectID);
         return true;
     } else {
@@ -131,7 +132,13 @@ void NetworkManager::sendPacket(const void* data, size_t size){
 
 void NetworkManager::sendPacketToPeer(uint32_t peerID, const void* data, size_t size){
     auto it = m_connectedPeers.find(peerID);
-    if (it == m_connectedPeers.end()) return;
+    if (it == m_connectedPeers.end()) {
+        std::string known;
+        for (auto& [id, peer] : m_connectedPeers) known += std::to_string(id) + " ";
+        if (known.empty()) known = "none";
+        log::warn("tried sending packet to peer {} but theyre not in m_connectedPeers, known peers are: {}", peerID, known);
+        return;
+    }
     ENetPacket* packet = enet_packet_create(data, size, ENET_PACKET_FLAG_RELIABLE);
     if (!packet) return;
     enet_peer_send(it->second, 0, packet);
@@ -167,7 +174,7 @@ void NetworkManager::poll(){
     while (enet_host_service(m_host, &event, 0) > 0){
         switch (event.type){
             case ENET_EVENT_TYPE_CONNECT:
-                log::info("peer connected");
+                log::info("peer connected, their connectID is {}", event.peer->connectID);
 
                 if (m_isHost) {
                     m_connectedPeers[event.peer->connectID] = event.peer;

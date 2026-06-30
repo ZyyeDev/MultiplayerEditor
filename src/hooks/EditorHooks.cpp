@@ -2,6 +2,7 @@
 #include <Geode/modify/LevelEditorLayer.hpp>
 #include <Geode/modify/EditorUI.hpp>
 #include <Geode/modify/GJBaseGameLayer.hpp>
+#include <Geode/modify/CCScheduler.hpp>
 
 #include <map>
 #include <string>
@@ -54,16 +55,19 @@ void try_add_object(auto obj){
 class $modify(MyLevelEditorLayer, LevelEditorLayer){
     struct Fields {
         bool m_playtesting = false;
-    };
 
-    void onEnterTransitionDidFinish() {
-        LevelEditorLayer::onEnterTransitionDidFinish();
-        if (g_isInSession && !g_isHost && g_network) {
-            FullSyncRequestPacket pkt;
-            pkt.header.type = PacketType::FULL_SYNC_REQUEST;
-            pkt.header.timestamp = getCurrentTimestamp();
-            pkt.header.senderID = g_network->getPeerID();
-            g_network->sendPacket(&pkt, sizeof(pkt));
+        ~Fields(){
+            if (g_isInSession && g_network){
+                g_network->disconnect();
+            }
+        }
+    };
+    
+    void onExit() {
+        LevelEditorLayer::onExit();
+        
+        if (g_isInSession && g_network){
+            g_network->disconnect();
         }
     }
 
@@ -136,6 +140,10 @@ class $modify(MyLevelEditorLayer, LevelEditorLayer){
         if (!LevelEditorLayer::init(level, noUI)) return false;
         
         m_editorUI = this->m_editorUI;
+        
+        if (g_isInSession && g_network && !g_isHost){
+            g_network->requestFullSync = true;
+        }
 
         return true;
     }

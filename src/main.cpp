@@ -75,6 +75,22 @@ class $modify(CCScheduler) {
                     g_sync->sendPlayerPosition(editorLayer, true);
                 }
             }
+
+            if (
+                g_network->requestFullSync &&
+                !g_isHost &&
+                (g_sync && g_sync->getEditorLayer())
+            ){
+                g_network->requestFullSync = false;
+
+                FullSyncRequestPacket pkt;
+
+                pkt.header.type = PacketType::FULL_SYNC_REQUEST;
+                pkt.header.timestamp = getCurrentTimestamp();
+                pkt.header.senderID = g_network->getPeerID();
+
+                g_network->sendPacket(&pkt, sizeof(pkt));
+            }
         }
     }
 };

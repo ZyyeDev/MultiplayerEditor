@@ -232,10 +232,18 @@ void SyncManager::onRemoteObjectModified(const ObjectStringPacket& packet) {
 
 void SyncManager::sendFullState(uint32_t targetPeerID) {
     auto editor = getEditorLayer();
-    if (!editor) return;
+    if (!editor) {
+        log::warn("no editor layer {}", targetPeerID);
+        return;
+    }
 
     auto allObjects = editor->m_objects;
-    if (!allObjects) return;
+    if (!allObjects) {
+        log::warn("editor has no objects array {}", targetPeerID);
+        return;
+    }
+
+    log::info("sending {} objects to peer {}", allObjects->count(), targetPeerID);
 
     for (int i = 0; i < allObjects->count(); i++) {
         auto obj = static_cast<GameObject*>(allObjects->objectAtIndex(i));
@@ -293,7 +301,9 @@ void SyncManager::handlePacket(const uint8_t* data, size_t size) {
             const HandshakePacket* packet = reinterpret_cast<const HandshakePacket*>(data);
             // i think we want to do this in another way but it works for now
             std::string myVersion = Mod::get()->getVersion().toNonVString();
+            log::info("got handshake from {}, their version '{}' my version '{}'", packet->header.senderID, packet->version, myVersion);
             if (myVersion != packet->version){
+                log::warn("version mismatch, kicking {}", packet->header.senderID);
                 if (g_isHost){
                     KickPacket _kickPacket;
                     _kickPacket.header.type = PacketType::KICK_USER;
@@ -310,6 +320,7 @@ void SyncManager::handlePacket(const uint8_t* data, size_t size) {
                 }
                 break;
             }
+            log::info("registering peer {} as '{}'", packet->header.senderID, packet->username);
             g_network->addPeer(packet->header.senderID, packet->username);
             if (g_isHost){
                 g_network->sendLobbyState(packet->header.senderID);
@@ -363,6 +374,7 @@ void SyncManager::handlePacket(const uint8_t* data, size_t size) {
             break;
         }
         case PacketType::FULL_SYNC_REQUEST: {
+            log::info("got full sync request from {}, am i host: {}", header->senderID, g_isHost);
             if (g_isHost) {
                 sendFullState(header->senderID);
             }

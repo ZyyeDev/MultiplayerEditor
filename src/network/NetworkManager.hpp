@@ -54,6 +54,8 @@ class NetworkManager{
 
         bool m_pendingKick = false;
         std::string m_pendingKickReason;
+
+        bool requestFullSync = false;
     private:
         ENetHost* m_host;
         ENetPeer* m_peer;
