@@ -50,6 +50,7 @@ class SyncManager{
         /* -- LEVEL SETTINGS -- */
         std::string extractSettingsString();
         void applySettingsString(const char* str, uint32_t len);
+        void applyLevelSettings(LevelSettingsPacket const& settings);
 
         /* -- PLAYER SYNC -- */
         std::map<uint32_t, RemotePlayer> m_remotePlayers;

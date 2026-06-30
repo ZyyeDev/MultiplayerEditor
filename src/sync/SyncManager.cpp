@@ -669,36 +669,51 @@ std::string SyncManager::extractSettingsString() {
     return sep != std::string::npos ? s.substr(0, sep) : s;
 }
 
-void SyncManager::applySettingsString(const char* str, uint32_t len) {
-    if (len == 0) return;
-    auto editor = getEditorLayer();
-    if (!editor || !editor->m_levelSettings) return;
-
-    std::string settingsStr(str, len);
-    gd::vector<gd::string> values;
-    gd::vector<void*> exists;
-
-    std::string token;
-    std::stringstream ss(settingsStr);
-    while (std::getline(ss, token, ',')) {
-        if (!token.empty()) {
-            values.push_back(gd::string(token.c_str()));
-        }
-    }
-    exists.resize(values.size(), reinterpret_cast<void*>(1));
-
-    m_applyingRemoteChanges = true;
-    //editor->m_levelSettings->customObjectSetup(values, exists);
-    m_applyingRemoteChanges = false;
-
-    if (editor->m_editorUI) {
-        editor->m_editorUI->updateButtons();
-    }
-}
-
 void SyncManager::onRemoteLevelSettingsChanged(const LevelSettingsPacket& packet) {
     if (g_isHost) return;
-    applySettingsString(packet.settingsString, packet.settingsLength);
+    
+    applyLevelSettings(packet);
+}
+
+void SyncManager::applyLevelSettings(const LevelSettingsPacket& settings) {
+    auto editor = getEditorLayer();
+    if (!editor) return;
+
+    if (!settings.saveString.empty() && editor->m_levelSettings) {
+        auto* newSettings = LevelSettingsObject::objectFromString(settings.saveString);
+        if (newSettings) {
+            editor->m_levelSettings->m_startMode = newSettings->m_startMode;
+            editor->m_levelSettings->m_startSpeed = newSettings->m_startSpeed;
+            editor->m_levelSettings->m_startMini = newSettings->m_startMini;
+            editor->m_levelSettings->m_startDual = newSettings->m_startDual;
+            editor->m_levelSettings->m_twoPlayerMode = newSettings->m_twoPlayerMode;
+            editor->m_levelSettings->m_isFlipped = newSettings->m_isFlipped;
+            editor->m_levelSettings->m_songOffset = newSettings->m_songOffset;
+
+            editor->updateOptions();
+        }
+    }
+
+    if (editor->m_level) {
+        bool songChanged = (editor->m_level->m_songID != settings.songID
+            || editor->m_level->m_audioTrack != settings.audioTrack);
+        editor->m_level->m_audioTrack = settings.audioTrack;
+        editor->m_level->m_songID = settings.songID;
+        editor->m_level->m_levelLength = settings.levelLength;
+
+        if (songChanged) {
+            if (settings.songID > 0) {
+                if (MusicDownloadManager::sharedState()->isSongDownloaded(settings.songID)) {
+                    //GameManager::get()->fadeInMusic(editor->m_level->getAudioFileName());
+                } else {
+                    geode::Notification::create("Downloading song", geode::NotificationIcon::Info)->show();
+                    MusicDownloadManager::sharedState()->downloadCustomSong(settings.songID);
+                }
+            } else {
+                //GameManager::get()->fadeInMusic(editor->m_level->getAudioFileName());
+            }
+        }
+    }
 }
 
 void SyncManager::onLocalLevelSettingsChanged() {

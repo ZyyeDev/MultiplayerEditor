@@ -66,6 +66,23 @@ class $modify(MyLevelEditorLayer, LevelEditorLayer){
         }
     }
 
+    void levelSettingsUpdated() {
+        LevelEditorLayer::levelSettingsUpdated();
+
+        if (g_isInSession && g_isHost && g_network) {
+            LevelSettingsPacket settings;
+            if (this->m_levelSettings) {
+                settings.saveString = this->m_levelSettings->getSaveString();
+            }
+            if (this->m_level) {
+                settings.audioTrack = this->m_level->m_audioTrack;
+                settings.songID = this->m_level->m_songID;
+                settings.levelLength = this->m_level->m_levelLength;
+            }
+            g_network->sendPacket(&settings, sizeof(settings));
+        }
+    }
+
     /*
     // why are they inlines :sob:
     void undoLastAction() {
@@ -146,12 +163,12 @@ class $modify(MyEditorUI, EditorUI) {
     bool init(LevelEditorLayer* editorLayer) {
         if (!EditorUI::init(editorLayer)) return false;
 
-        if (g_isInSession && !g_isHost){
+        /*if (g_isInSession && !g_isHost){
             auto settingsbtn = this->getChildByID("settings-button");
             if (settingsbtn){
                 settingsbtn->setVisible(false);
             }
-        }
+        }*/
 
         schedule(schedule_selector(MyEditorUI::syncTick), 0.1f);
 

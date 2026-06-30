@@ -75,6 +75,10 @@ struct MousePacket{
 struct LevelSettingsPacket {
     PacketHeader header;
     uint32_t settingsLength;
+    int audioTrack;
+    int songID;
+    int levelLength;
+    std::string saveString;
     char settingsString[8192];
 };
 
