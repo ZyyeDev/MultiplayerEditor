@@ -1,5 +1,6 @@
 #include <Geode/Geode.hpp>
 #include <sstream>
+#include <cstring>
 #include "SyncManager.hpp"
 #include "../network/NetworkManager.hpp"
 #include "../network/Packets.hpp"
@@ -53,6 +54,37 @@ LevelEditorLayer* SyncManager::getEditorLayer(){
     return scene->getChildByType<LevelEditorLayer>(0);
 }
 
+void SyncManager::sendObjectPackets(PacketType type, const std::string& uid, const std::string& objString) {
+    const size_t chunkSize = sizeof(ObjectStringPacket::objectString);
+    uint32_t chunkIndex = 0;
+    size_t offset = 0;
+
+    while (offset < objString.size() || chunkIndex == 0) {
+        size_t remaining = objString.size() - offset;
+        size_t thisChunkLen = std::min(remaining, chunkSize);
+        bool hasMore = (offset + thisChunkLen) < objString.size();
+
+        ObjectStringPacket packet;
+        packet.header.type = type;
+        packet.header.timestamp = getCurrentTimestamp();
+        packet.header.senderID = g_network->getPeerID();
+        strncpy(packet.uid, uid.c_str(), 31);
+        packet.uid[31] = '\0';
+        packet.chunkIndex = chunkIndex;
+        packet.chunkLength = (uint32_t)thisChunkLen;
+        packet.hasMore = hasMore;
+        memcpy(packet.objectString, objString.c_str() + offset, thisChunkLen);
+        if (thisChunkLen < chunkSize) packet.objectString[thisChunkLen] = '\0';
+
+        g_network->sendPacket(&packet, sizeof(packet));
+
+        offset += thisChunkLen;
+        chunkIndex++;
+
+        if (!hasMore) break;
+    }
+}
+
 void SyncManager::onLocalObjectAdded(GameObject* obj) {
     std::string uid = generateUID();
     trackObject(uid, obj);
@@ -61,19 +93,7 @@ void SyncManager::onLocalObjectAdded(GameObject* obj) {
     gd::string gdString = obj->getSaveString(nullptr);
     std::string objString = std::string(gdString);
     
-    ObjectStringPacket packet;
-    packet.header.type = PacketType::OBJECT_ADD;
-    packet.header.timestamp = getCurrentTimestamp();
-    packet.header.senderID = g_network->getPeerID();
-    
-    strncpy(packet.uid, uid.c_str(), 31);
-    packet.uid[31] = '\0';
-    
-    packet.stringLength = std::min(objString.length(), sizeof(packet.objectString) - 1);
-    strncpy(packet.objectString, objString.c_str(), packet.stringLength);
-    packet.objectString[packet.stringLength] = '\0';
-    
-    g_network->sendPacket(&packet, sizeof(packet));
+    sendObjectPackets(PacketType::OBJECT_ADD, uid, objString);
 }
 
 
@@ -109,31 +129,17 @@ void SyncManager::onLocalObjectModified(GameObject* obj) {
     gd::string gdString = obj->getSaveString(nullptr);
     std::string objString = std::string(gdString);
     
-    ObjectStringPacket packet;
-    packet.header.type = PacketType::OBJECT_UPDATE;
-    packet.header.timestamp = getCurrentTimestamp();
-    packet.header.senderID = g_network->getPeerID();
-    
-    strncpy(packet.uid, uid.c_str(), 31);
-    packet.uid[31] = '\0';
-    
-    packet.stringLength = std::min(objString.length(), sizeof(packet.objectString) - 1);
-    strncpy(packet.objectString, objString.c_str(), packet.stringLength);
-    packet.objectString[packet.stringLength] = '\0';
-    
-    g_network->sendPacket(&packet, sizeof(packet));
+    sendObjectPackets(PacketType::OBJECT_UPDATE, uid, objString);
 }
 
-void SyncManager::onRemoteObjectAdded(const ObjectStringPacket& packet) {
+void SyncManager::onRemoteObjectAdded(const std::string& uid, const std::string& objString) {
     auto editor = getEditorLayer();
     if (!editor) {
-        log::error("No editor layer!");
+        log::error("no editor layer!");
         return;
     }
     
     m_applyingRemoteChanges = true;
-    
-    std::string objString(packet.objectString, packet.stringLength);
     
     int countBefore = editor->m_objects ? editor->m_objects->count() : 0;
     
@@ -145,12 +151,11 @@ void SyncManager::onRemoteObjectAdded(const ObjectStringPacket& packet) {
             editor->m_objects->objectAtIndex(countAfter - 1)
         );
         
-        std::string uid(packet.uid);
         trackObject(uid, newObj);
         
-        log::info("Created object: {}", uid);
+        log::info("created object: {}", uid);
     } else {
-        log::error("Object creation failed!");
+        log::error("object creation failed!");
     }
     
     m_applyingRemoteChanges = false;
@@ -188,13 +193,14 @@ void SyncManager::onRemoteObjectDestroyed(const ObjectDeletePacket& packet) {
     m_applyingRemoteChanges = false;
 }
 
-void SyncManager::onRemoteObjectModified(const ObjectStringPacket& packet) {
-    std::string uid(packet.uid);
+void SyncManager::onRemoteObjectModified(const std::string& uid, const std::string& objString) {
     auto it = m_syncedObjects.find(uid);
     
     if (it == m_syncedObjects.end()) return;
     
     GameObject* oldObj = it->second;
+    if (!oldObj) return;
+
     auto editor = getEditorLayer();
     if (!editor || !editor->m_objects) return;
     
@@ -213,7 +219,6 @@ void SyncManager::onRemoteObjectModified(const ObjectStringPacket& packet) {
     }
     untrackObject(uid);
     
-    std::string objString(packet.objectString, packet.stringLength);
     int countBefore = editor->m_objects->count();
     editor->createObjectsFromString(objString, false, false);
     
@@ -224,7 +229,7 @@ void SyncManager::onRemoteObjectModified(const ObjectStringPacket& packet) {
         );
         trackObject(uid, newObj);
     } else {
-        log::error("Object update failed for uid: {}", uid);
+        log::error("object update failed for uid: {}", uid);
     }
     
     m_applyingRemoteChanges = false;
@@ -255,32 +260,39 @@ void SyncManager::sendFullState(uint32_t targetPeerID) {
 
         gd::string gdString = obj->getSaveString(nullptr);
         std::string objString = std::string(gdString);
-
-        ObjectStringPacket packet;
-        packet.header.type = PacketType::OBJECT_ADD;
-        packet.header.timestamp = getCurrentTimestamp();
-        packet.header.senderID = g_network->getPeerID();
-
         std::string uid = getObjectUid(obj);
-        strncpy(packet.uid, uid.c_str(), 31);
-        packet.uid[31] = '\0';
 
-        packet.stringLength = std::min(objString.length(), sizeof(packet.objectString) - 1);
-        strncpy(packet.objectString, objString.c_str(), packet.stringLength);
-        packet.objectString[packet.stringLength] = '\0';
+        const size_t chunkSize = sizeof(ObjectStringPacket::objectString);
+        uint32_t chunkIndex = 0;
+        size_t offset = 0;
 
-        g_network->sendPacketToPeer(targetPeerID, &packet, sizeof(packet));
+        while (offset < objString.size() || chunkIndex == 0) {
+            size_t remaining = objString.size() - offset;
+            size_t thisChunkLen = std::min(remaining, chunkSize);
+            bool hasMore = (offset + thisChunkLen) < objString.size();
+
+            ObjectStringPacket pkt;
+            pkt.header.type = PacketType::OBJECT_ADD;
+            pkt.header.timestamp = getCurrentTimestamp();
+            pkt.header.senderID = g_network->getPeerID();
+            strncpy(pkt.uid, uid.c_str(), 31);
+            pkt.uid[31] = '\0';
+            pkt.chunkIndex = chunkIndex;
+            pkt.chunkLength = (uint32_t)thisChunkLen;
+            pkt.hasMore = hasMore;
+            memcpy(pkt.objectString, objString.c_str() + offset, thisChunkLen);
+            if (thisChunkLen < chunkSize) pkt.objectString[thisChunkLen] = '\0';
+
+            g_network->sendPacketToPeer(targetPeerID, &pkt, sizeof(pkt));
+
+            offset += thisChunkLen;
+            chunkIndex++;
+            if (!hasMore) break;
+        }
+
     }
 
-    LevelSettingsPacket settingsPkt;
-    settingsPkt.header.type = PacketType::LEVEL_SETTINGS;
-    settingsPkt.header.timestamp = getCurrentTimestamp();
-    settingsPkt.header.senderID = g_network->getPeerID();
-    std::string settingsStr = extractSettingsString();
-    settingsPkt.settingsLength = (uint32_t)std::min(settingsStr.size(), sizeof(settingsPkt.settingsString) - 1);
-    memcpy(settingsPkt.settingsString, settingsStr.c_str(), settingsPkt.settingsLength);
-    settingsPkt.settingsString[settingsPkt.settingsLength] = '\0';
-    g_network->sendPacketToPeer(targetPeerID, &settingsPkt, sizeof(settingsPkt));
+    onLocalLevelSettingsChanged();
 
     FullSyncEndPacket endPkt;
     endPkt.header.type = PacketType::FULL_SYNC_END;
@@ -298,6 +310,7 @@ void SyncManager::handlePacket(const uint8_t* data, size_t size) {
     
     switch (header->type) {
         case PacketType::HANDSHAKE: {
+            if (size < sizeof(HandshakePacket)) break;
             const HandshakePacket* packet = reinterpret_cast<const HandshakePacket*>(data);
             // i think we want to do this in another way but it works for now
             std::string myVersion = Mod::get()->getVersion().toNonVString();
@@ -329,6 +342,7 @@ void SyncManager::handlePacket(const uint8_t* data, size_t size) {
             break;
         }
         case PacketType::KICK_USER: {
+            if (size < sizeof(KickPacket)) break;
             const KickPacket* packet = reinterpret_cast<const KickPacket*>(data);
             if (!g_isHost && packet->userToKick == g_network->getPeerID()){
                 g_network->gotKicked(packet->kickReason);
@@ -343,12 +357,14 @@ void SyncManager::handlePacket(const uint8_t* data, size_t size) {
             break;
         }
         case PacketType::PEER_JOINED: {
+            if (size < sizeof(PeerJoinedPacket)) break;
             const PeerJoinedPacket* packet = reinterpret_cast<const PeerJoinedPacket*>(data);
             g_network->addPeer(packet->peerID, packet->username);
             log::info("peer joined {} ({})", packet->peerID, packet->username);
             break;
         }
         case PacketType::PEER_LEFT: {
+            if (size < sizeof(PeerLeftPacket)) break;
             const PeerLeftPacket* packet = reinterpret_cast<const PeerLeftPacket*>(data);
             g_network->removePeer(packet->peerID);
             m_remoteSelections[packet->peerID].clear();
@@ -359,11 +375,12 @@ void SyncManager::handlePacket(const uint8_t* data, size_t size) {
             break;
         }
         case PacketType::LOBBY_SYNC: {
+            if (size < sizeof(LobbySyncPacket)) break;
             const LobbySyncPacket* packet = reinterpret_cast<const LobbySyncPacket*>(data);
 
             g_network->m_peersInLobby.clear();
 
-            for (uint32_t i = 0; i < packet->memberCount; i++){
+            for (uint32_t i = 0; i < packet->memberCount && i < maxPlayers; i++){
                 g_network->addPeer(
                     packet->members[i].peerID,
                     packet->members[i].username
@@ -392,38 +409,66 @@ void SyncManager::handlePacket(const uint8_t* data, size_t size) {
             break;
         }
         case PacketType::OBJECT_ADD: {
+            if (size < sizeof(ObjectStringPacket)) break;
             const ObjectStringPacket* packet = reinterpret_cast<const ObjectStringPacket*>(data);
-            onRemoteObjectAdded(*packet);
+            std::string uid(packet->uid);
+
+            if (packet->chunkIndex == 0) m_incomingChunks[uid] = ChunkBuffer{};
+            m_incomingChunks[uid].data.append(packet->objectString, packet->chunkLength);
+            m_incomingChunks[uid].lastChunkIndex = packet->chunkIndex;
+
+            if (!packet->hasMore) {
+                std::string fullString = m_incomingChunks[uid].data;
+                m_incomingChunks.erase(uid);
+                onRemoteObjectAdded(uid, fullString);
+            }
             break;
         }
         case PacketType::OBJECT_DELETE: {
+            if (size < sizeof(ObjectDeletePacket)) break;
             const ObjectDeletePacket* packet = reinterpret_cast<const ObjectDeletePacket*>(data);
             onRemoteObjectDestroyed(*packet);
             break;
         }
         case PacketType::OBJECT_UPDATE: {
+            if (size < sizeof(ObjectStringPacket)) break;
             const ObjectStringPacket* packet = reinterpret_cast<const ObjectStringPacket*>(data);
-            onRemoteObjectModified(*packet);
+            std::string uid(packet->uid);
+
+            if (packet->chunkIndex == 0) m_incomingChunks[uid] = ChunkBuffer{};
+            m_incomingChunks[uid].data.append(packet->objectString, packet->chunkLength);
+            m_incomingChunks[uid].lastChunkIndex = packet->chunkIndex;
+
+            if (!packet->hasMore) {
+                std::string fullString = m_incomingChunks[uid].data;
+                m_incomingChunks.erase(uid);
+                onRemoteObjectModified(uid, fullString);
+            }
             break;
         }
         case PacketType::MOUSE_MOVE: {
+            if (size < sizeof(MousePacket)) break;
             const MousePacket* packet = reinterpret_cast<const MousePacket*>(data);
             onRemoteCursorUpdate(packet->header.senderID, packet->x, packet->y);
             break;
         }
         case PacketType::COLOR_SYNC: {
+            if (size < sizeof(ColorChannelsPacket)) break;
             const ColorChannelsPacket* packet = reinterpret_cast<const ColorChannelsPacket*>(data);
-            restoreColorChannels(getEditorLayer(), packet->colorDat);
+            if (packet->count > 200) break;
+            std::vector<SavedColorData> colors(packet->colorDat, packet->colorDat + packet->count);
+            restoreColorChannels(getEditorLayer(), colors);
             break;
         }
         case PacketType::SELECT_CHANGE: {
+            if (size < sizeof(SelectPacket)) break;
             const SelectPacket* packet = reinterpret_cast<const SelectPacket*>(data);
             
             if (packet->chunkIndex == 0) {
                 m_remoteSelections[packet->header.senderID].clear();
             }
             
-            for (uint32_t i = 0; i < packet->countInChunk; i++) {
+            for (uint32_t i = 0; i < packet->countInChunk && i < 50; i++) {
                 std::string uid(packet->uids[i]);
                 m_remoteSelections[packet->header.senderID][uid] = 3.0f;
             }
@@ -435,12 +480,13 @@ void SyncManager::handlePacket(const uint8_t* data, size_t size) {
             break;
         }
         case PacketType::LEVEL_SETTINGS: {
-            if (size < sizeof(PacketHeader) + sizeof(uint32_t)) break;
+            if (size < sizeof(LevelSettingsPacket)) break;
             const LevelSettingsPacket* packet = reinterpret_cast<const LevelSettingsPacket*>(data);
             onRemoteLevelSettingsChanged(*packet);
             break;
         }
         case PacketType::PLAYER_POSITION: {
+            if (size < sizeof(PlayerPositionPacket)) break;
             const PlayerPositionPacket* packet = reinterpret_cast<const PlayerPositionPacket*>(data);
             
             auto editorLayer = getEditorLayer();
@@ -1004,6 +1050,7 @@ void SyncManager::clearAllRemoteState() {
 
     m_syncedObjects.clear();
     m_localObjects.clear();
+    m_incomingChunks.clear();
 
     MouseTooltip::get()->clear();
 }

@@ -37,6 +37,15 @@ class SyncManager{
 
         bool m_applyingRemoteChanges = false;
 
+        /* -- OBJECT CHUNK REASSEMBLY -- */
+        struct ChunkBuffer {
+            std::string data;
+            uint32_t lastChunkIndex = 0;
+        };
+        std::map<std::string, ChunkBuffer> m_incomingChunks;
+
+        void sendObjectPackets(PacketType type, const std::string& uid, const std::string& objString);
+
         /* -- LOCAL OBJECT OWNERSHIP (for undo thingy) -- */
         std::unordered_set<GameObject*> m_localObjects;
 
@@ -80,9 +89,9 @@ class SyncManager{
 
         /* --- REMOTE EVENTS --- */
         // object stuff
-        void onRemoteObjectAdded(const ObjectStringPacket& packet);
+        void onRemoteObjectAdded(const std::string& uid, const std::string& objString);
         void onRemoteObjectDestroyed(const ObjectDeletePacket& packet);
-        void onRemoteObjectModified(const ObjectStringPacket& packet);
+        void onRemoteObjectModified(const std::string& uid, const std::string& objString);
 
         // selection stuff
         void onRemoteCursorUpdate(const uint32_t& userID, int x, int y);

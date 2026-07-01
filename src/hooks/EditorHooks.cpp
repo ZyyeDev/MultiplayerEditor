@@ -280,14 +280,17 @@ class $modify(MyEditorUI, EditorUI) {
         }
 
         /*if (g_isInSession && g_network && g_sync){
-            ColorChannelsPacket colorPacket;
+            auto colors = g_sync->saveAllColorChannels(g_sync->getEditorLayer());
 
-            colorPacket.header.type = PacketType::LEVEL_SETTINGS;
+            ColorChannelsPacket colorPacket;
+            colorPacket.header.type = PacketType::COLOR_SYNC;
             colorPacket.header.timestamp = getCurrentTimestamp();
             colorPacket.header.senderID = g_network->getPeerID();
+            colorPacket.count = (uint32_t)std::min(colors.size(), (size_t)200);
+            for (uint32_t i = 0; i < colorPacket.count; i++){
+                colorPacket.colorDat[i] = colors[i];
+            }
 
-            colorPacket.colorDat = g_sync->saveAllColorChannels(g_sync->getEditorLayer());
-                
             g_network->sendPacket(&colorPacket, sizeof(colorPacket));
         }*/
 

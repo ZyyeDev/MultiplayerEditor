@@ -59,8 +59,10 @@ struct HandshakePacket{
 struct ObjectStringPacket {
     PacketHeader header;
     char uid[32];
-    uint32_t stringLength;
-    char objectString[8192];
+    uint32_t chunkIndex;
+    uint32_t chunkLength;
+    bool hasMore;
+    char objectString[4096];
 };
 
 struct ObjectDeletePacket{
@@ -82,7 +84,8 @@ struct MousePacket{
 
 struct ColorChannelsPacket{
     PacketHeader header;
-    std::vector<SavedColorData> colorDat;
+    uint32_t count;
+    SavedColorData colorDat[200];
 };
 
 struct LevelSettingsPacket {
