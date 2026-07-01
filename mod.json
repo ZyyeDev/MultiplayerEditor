@@ -10,7 +10,7 @@
 	"name": "Multiplayer Editor",
 	"version": "v0.0.3-alpha",
 	"developer": "ZyyeDev",
-	"description": "Mutliplayer Collab Editor",
+	"description": "Multiplayer Collab Editor",
     "resources": {	
         "sprites": [
             "resources/*.png"
