@@ -18,5 +18,10 @@
     },
 	"dependencies": {
 		"geode.node-ids": ">=1.11.0"
+	},
+	"tags": ["editor", "online", "utility"],
+	"links": {
+		"community": "https://discord.gg/eCfmxKgQpU",
+		"source": "https://github.com/ZyyeDev/MultiplayerEditor"
 	}
 }
