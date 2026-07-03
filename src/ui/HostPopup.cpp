@@ -24,30 +24,21 @@ bool HostPopup::init(){
 
     auto winSize = this->m_mainLayer->getContentSize();
 
-    // info text
-    auto infoLabel = CCLabelBMFont::create("Host IP:", "bigFont.fnt");
-    infoLabel->setScale(.4f);
-    infoLabel->setPosition(ccp(
-        winSize.width/2,
-        winSize.height/2 + 20
-    ));
-    this->m_mainLayer->addChild(infoLabel);
-
     // ip label
     m_ipLabel = CCLabelBMFont::create("(Host To Show IP)","chatFont.fnt");
     m_ipLabel->setScale(.6f);
     m_ipLabel->setPosition(ccp(
         winSize.width/2,
-        winSize.height/2 + 65
+        winSize.height/2 + 90
     ));
     this->m_mainLayer->addChild(m_ipLabel);
 
     // help label
-    m_helpLabel = CCLabelBMFont::create("Give your hamachi or public ip, NOT THE LOCAL ONE (above)","goldFont.fnt");
+    m_helpLabel = CCLabelBMFont::create("Give your hamachi or public ip, NOT THE LOCAL ONE \n (THE IP ABOVE THIS IS THE LOCAL IP)","goldFont.fnt");
     m_helpLabel->setScale(.4f);
     m_helpLabel->setPosition(ccp(
         winSize.width/2,
-        winSize.height/2 + 45
+        winSize.height/2 + 75
     ));
     m_helpLabel->setVisible(false);
     this->m_mainLayer->addChild(m_helpLabel);
@@ -59,14 +50,45 @@ bool HostPopup::init(){
     }
 
     // port input
+    auto portLabel = CCLabelBMFont::create("Port:","bigFont.fnt");
+    portLabel->setScale(0.5f);
+    portLabel->setPosition(ccp(
+        winSize.width/2,
+        winSize.height/2 + 60
+    ));
+    this->m_mainLayer->addChild(portLabel);
+
     m_portInput = TextInput::create(100.0f, std::to_string(g_network->m_port), "chatFont.fnt");
     m_portInput->setFilter("1234567890");
     m_portInput->setString(std::to_string(g_network->m_port));
     m_portInput->setPosition(ccp(
         winSize.width/2,
-        winSize.height/2 - 10
+        winSize.height/2 + 30
     ));
     this->m_mainLayer->addChild(m_portInput);
+
+    // password input
+    auto passLabel = CCLabelBMFont::create("Password:","bigFont.fnt");
+    passLabel->setScale(0.5f);
+    passLabel->setPosition(ccp(
+        winSize.width/2,
+        winSize.height/2
+    ));
+    this->m_mainLayer->addChild(passLabel);
+
+    m_passInput = TextInput::create(100.0f, "Leave blank for no password", "chatFont.fnt");
+    m_passInput->setFilter("qwertyuiopasdfghjklzxcvbnm1234567890,.-@!_");
+    m_passInput->setString(g_network->getPassword());
+    m_passInput->setPosition(ccp(
+        winSize.width/2,
+        winSize.height/2 - 35
+    ));
+    this->m_mainLayer->addChild(m_passInput);
+    m_passInput->setCallback([this](const std::string& text){
+        log::info("meow pass changed to {}", text);
+        g_network->setPassword(text);
+    }
+    );
 
     // host button
     hostBtn = CCMenuItemSpriteExtra::create(
@@ -76,7 +98,7 @@ bool HostPopup::init(){
     );
     hostBtn->setPosition(ccp(
         winSize.width/2,
-        winSize.height/2-40
+        winSize.height/2-80
     ));
     if (g_isHost && g_isInSession){
         hostBtn->setSprite(ButtonSprite::create("Stop Hosting", "goldFont.fnt", "GJ_button_01.png", .8f));
@@ -126,7 +148,7 @@ void HostPopup::onStartHost(CCObject*){
         }
     }
 
-    if (g_network->host(port)){
+    if (g_network->host(port, m_passInput->getString())){
         if (hostBtn){
             hostBtn->setSprite(ButtonSprite::create("Stop Hosting", "goldFont.fnt", "GJ_button_01.png", .8f));
         }

@@ -10,6 +10,7 @@ class HostPopup : public Popup{
         CCLabelBMFont* m_helpLabel;
         CCMenuItemSpriteExtra* hostBtn;
         TextInput* m_portInput;
+        TextInput* m_passInput;
         
         bool init() override;
         void onStartHost(CCObject*);

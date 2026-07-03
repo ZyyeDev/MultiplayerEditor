@@ -44,16 +44,11 @@ struct PacketHeader{
     uint32_t senderID;
 };
 
-struct KickPacket {
-    PacketHeader header;
-    uint32_t userToKick;
-    char kickReason[128];
-};
-
 struct HandshakePacket{
     PacketHeader header;
     char username[64];
     char version[32];
+    char password[64]; // i think it will be a good idea to hash this, but for now i dont really think its super needed
 };
 
 struct ObjectStringPacket {
@@ -99,6 +94,12 @@ struct LevelSettingsPacket {
 
 struct FullSyncEndPacket {
     PacketHeader header;
+};
+
+struct KickPacket {
+    PacketHeader header;
+    uint32_t userToKick;
+    char kickReason[128];
 };
 
 struct PlayerIconData{

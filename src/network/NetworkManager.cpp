@@ -11,7 +11,7 @@ NetworkManager::~NetworkManager() {
     disconnect();
 }
 
-bool NetworkManager::host(uint16_t port){
+bool NetworkManager::host(uint16_t port, const std::string& password){
     ENetAddress address;
     address.host = ENET_HOST_ANY;
     address.port = port;
@@ -27,6 +27,8 @@ bool NetworkManager::host(uint16_t port){
     // add ourself (host)
     addPeer(1, getUsername());
 
+    setPassword(password);
+
     log::info("Hosting on port {}", port);
     return true;
 }
@@ -41,7 +43,7 @@ bool NetworkManager::stopHosting(){
     return false;
 }
 
-bool NetworkManager::connect(const std::string& ip, uint16_t port){
+bool NetworkManager::connect(const std::string& ip, uint16_t port, const std::string& password){
     m_host = enet_host_create(nullptr, 1, 2, 0, 0);
     if (m_host == nullptr){
         log::error("Failed to create enet client!");
@@ -63,22 +65,14 @@ bool NetworkManager::connect(const std::string& ip, uint16_t port){
     ENetEvent event;
     if (enet_host_service(m_host, &event, 5000) > 0 && event.type == ENET_EVENT_TYPE_CONNECT){
         log::info("connected to {}:{}! my connectID is {}, getPeerID() says {}", ip, port, event.peer->connectID, getPeerID());
+
         m_port = port;
         m_isHost = false;
-        HandshakePacket packet;
-        packet.header.type = PacketType::HANDSHAKE;
-        packet.header.timestamp = getCurrentTimestamp();
-        packet.header.senderID = getPeerID();
-        gd::string username = getUsername();
-        strncpy(packet.username, username.c_str(), 63);
-        packet.username[63] = '\0';
-        std::string version = Mod::get()->getVersion().toNonVString();
-        strncpy(packet.version, version.c_str(), 31);
-        packet.version[31] = '\0';
+        m_password = password;
+        m_connectId = event.peer->connectID;
+
+        m_pendingHandshake = true;
         
-        sendPacket(&packet, sizeof(packet));
-        log::info("sent handshake with senderID {}", packet.header.senderID);
-        if (m_onConnect) m_onConnect(event.peer->connectID);
         return true;
     } else {
         //log::error("connection failed, event.type is {}", event.type);
@@ -147,27 +141,76 @@ void NetworkManager::sendPacketToPeer(uint32_t peerID, const void* data, size_t 
 void NetworkManager::poll(){
     if (!m_host) return;
 
-    if (m_pendingKick){
-        m_pendingKick = false;
+    auto editorLayer = LevelEditorLayer::get();
+    if (editorLayer){
+        if (m_pendingHandshake){
+            HandshakePacket packet;
 
-        if (m_onDisconnect){
-            m_onDisconnect();
+            packet.header.type = PacketType::HANDSHAKE;
+            
+            packet.header.timestamp = getCurrentTimestamp();
+            packet.header.senderID = getPeerID();
+            gd::string username = getUsername();
+
+            strncpy(packet.username, username.c_str(), 63);
+            packet.username[63] = '\0';
+
+            std::string version = Mod::get()->getVersion().toNonVString();
+            strncpy(packet.version, version.c_str(), 31);
+            packet.version[31] = '\0';
+
+            strncpy(packet.password, m_password.c_str(), 63);
+            packet.password[63] = '\0';
+            
+            sendPacket(&packet, sizeof(packet));
+            log::info("sent handshake with senderID {}", packet.header.senderID);
+            if (m_onConnect) m_onConnect(m_connectId);
+        }
+        if (m_pendingKick){
+            m_pendingKick = false;
+
+            if (m_onDisconnect){
+                m_onDisconnect();
+            }
+
+            disconnect();
+
+            auto scene = CCScene::create();
+            auto menuLayer = MenuLayer::create();
+            scene->addChild(menuLayer);
+
+            CCDirector::sharedDirector()->replaceScene(CCTransitionFade::create(0.5f,scene));
+
+            FLAlertLayer::create(
+                "You Got Kicked!",
+                ("Reason: " + m_pendingKickReason).c_str(),
+                "Ok"
+            )->show();
+            return;
         }
 
-        disconnect();
+        if (m_pendingDisconnect){
+            m_pendingDisconnect = false;
 
-        auto scene = CCScene::create();
-        auto menuLayer = MenuLayer::create();
-        scene->addChild(menuLayer);
+            if (m_onDisconnect){
+                m_onDisconnect();
+            }
 
-        CCDirector::sharedDirector()->replaceScene(CCTransitionFade::create(0.5f,scene));
+            disconnect();
 
-        FLAlertLayer::create(
-            "You Got Kicked!",
-            ("Reason: " + m_pendingKickReason).c_str(),
-            "Ok"
-        )->show();
-        return;
+            auto scene = CCScene::create();
+            auto menuLayer = MenuLayer::create();
+            scene->addChild(menuLayer);
+
+            CCDirector::sharedDirector()->replaceScene(CCTransitionFade::create(0.5f,scene));
+
+            FLAlertLayer::create(
+                "Disconnected",
+                "Lost connection to the host.",
+                "Ok"
+            )->show();
+            return;
+        }
     }
 
     ENetEvent event;
@@ -198,10 +241,11 @@ void NetworkManager::poll(){
                     removePeer(disconnectedPeerID);
                     m_connectedPeers.erase(disconnectedPeerID);
                     broadcastPeerLeft(disconnectedPeerID);
-                }else{
+                    if (m_onDisconnect) m_onDisconnect();
+                } else {
                     m_peer = nullptr;
+                    m_pendingDisconnect = true;
                 }
-                if (m_onDisconnect) m_onDisconnect();
                 break;
             }
             default:

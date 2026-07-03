@@ -15,9 +15,9 @@ class NetworkManager{
 
         uint16_t m_port = 8080;
 
-        bool host(uint16_t port);
+        bool host(uint16_t port, const std::string& password);
         bool stopHosting();
-        bool connect(const std::string& ip, uint16_t port);
+        bool connect(const std::string& ip, uint16_t port, const std::string& password);
         void disconnect();
 
         uint32_t getPeerID() const {
@@ -52,13 +52,16 @@ class NetworkManager{
 
         void gotKicked(std::string reason);
 
-        bool m_pendingKick = false;
-        std::string m_pendingKickReason;
+        bool checkPassword(std::string password) { return m_password == password; }
+        void setPassword(std::string password) { if (isHost()) m_password = password; }
+        std::string getPassword() { return m_password; }
 
         bool requestFullSync = false;
     private:
         ENetHost* m_host;
         ENetPeer* m_peer;
+
+        std::string m_password = ""; // we need to hashy hashy this, but me is lazy rn. I dont see any real vulnerability for not hashing this rn, maybe im stupid.
         
         bool m_isHost;
         gd::string m_username;
@@ -68,4 +71,10 @@ class NetworkManager{
         std::function<void()> m_onDisconnect;
 
         std::map<uint32_t, ENetPeer*> m_connectedPeers;
+
+        bool m_pendingHandshake = false;
+        bool m_pendingDisconnect = false;
+        bool m_pendingKick = false;
+        std::string m_pendingKickReason;
+        enet_uint32 m_connectId;
 };

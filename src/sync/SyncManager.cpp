@@ -315,29 +315,51 @@ void SyncManager::handlePacket(const uint8_t* data, size_t size) {
             // i think we want to do this in another way but it works for now
             std::string myVersion = Mod::get()->getVersion().toNonVString();
             log::info("got handshake from {}, their version '{}' my version '{}'", packet->header.senderID, packet->version, myVersion);
-            if (myVersion != packet->version){
-                log::warn("version mismatch, kicking {}", packet->header.senderID);
-                if (g_isHost){
+            
+            log::info("registering peer {} as '{}'", packet->header.senderID, packet->username);
+            g_network->addPeer(packet->header.senderID, packet->username);
+            if (g_isHost){
+                g_network->broadcastPeerJoined(packet->header.senderID, packet->username);
+
+                // we MUST do this in another way
+                if (!g_network->checkPassword(packet->password)){
+                    log::info("user connecting password is incorrect");
+                    
                     KickPacket _kickPacket;
                     _kickPacket.header.type = PacketType::KICK_USER;
                     _kickPacket.header.timestamp = getCurrentTimestamp();
                     _kickPacket.header.senderID = g_network->getPeerID();
                     _kickPacket.userToKick = packet->header.senderID;
-                    strncpy(_kickPacket.kickReason, "Version Mismatch", 127);
+                    strncpy(_kickPacket.kickReason, "Wrong Password", 127);
                     _kickPacket.kickReason[127] = '\0';
                     g_network->sendPacketToPeer(
                         packet->header.senderID,
                         &_kickPacket,
                         sizeof(_kickPacket)
                     );
+                    break;
                 }
-                break;
-            }
-            log::info("registering peer {} as '{}'", packet->header.senderID, packet->username);
-            g_network->addPeer(packet->header.senderID, packet->username);
-            if (g_isHost){
+
+                if (myVersion != packet->version){
+                    log::warn("version mismatch, kicking {}", packet->header.senderID);
+                    if (g_isHost){
+                        KickPacket _kickPacket;
+                        _kickPacket.header.type = PacketType::KICK_USER;
+                        _kickPacket.header.timestamp = getCurrentTimestamp();
+                        _kickPacket.header.senderID = g_network->getPeerID();
+                        _kickPacket.userToKick = packet->header.senderID;
+                        strncpy(_kickPacket.kickReason, "Version Mismatch", 127);
+                        _kickPacket.kickReason[127] = '\0';
+                        g_network->sendPacketToPeer(
+                            packet->header.senderID,
+                            &_kickPacket,
+                            sizeof(_kickPacket)
+                        );
+                    }
+                    break;
+                }
+
                 g_network->sendLobbyState(packet->header.senderID);
-                g_network->broadcastPeerJoined(packet->header.senderID, packet->username);
             }
             break;
         }
