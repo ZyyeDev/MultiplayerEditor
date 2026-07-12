@@ -123,7 +123,10 @@ class $modify(MyLevelEditorLayer, LevelEditorLayer){
     void onPlaytest() {
         log::info("start playtest");
         m_fields->m_playtesting = true;
-        
+        if (g_sync) {
+            g_sync->cleanUpPlayers();
+        }
+
         LevelEditorLayer::onPlaytest();
     }
 

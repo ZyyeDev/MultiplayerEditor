@@ -1058,6 +1058,13 @@ void SyncManager::cleanUpPlayers() {
     }
     m_remotePlayers.clear();
     m_lastPlayerSendTime = 0.0f;
+
+    for (auto& [userId, cursor] : m_remoteCursors) {
+        if (cursor && cursor->getParent()){
+            cursor->removeFromParent();
+        }
+    }
+    m_remoteCursors.clear();
 }
 
 void SyncManager::clearAllRemoteState(){
