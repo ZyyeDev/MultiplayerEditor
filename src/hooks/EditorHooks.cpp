@@ -4,6 +4,7 @@
 #include <Geode/modify/GJBaseGameLayer.hpp>
 #include <Geode/modify/CCScheduler.hpp>
 #include <Geode/modify/GJEffectManager.hpp>
+#include <Geode/modify/ColorSelectPopup.hpp>
 
 #include <map>
 #include <string>
@@ -279,21 +280,6 @@ class $modify(MyEditorUI, EditorUI) {
             }
         }
 
-        /*if (g_isInSession && g_network && g_sync){
-            auto colors = g_sync->saveAllColorChannels(g_sync->getEditorLayer());
-
-            ColorChannelsPacket colorPacket;
-            colorPacket.header.type = PacketType::COLOR_SYNC;
-            colorPacket.header.timestamp = getCurrentTimestamp();
-            colorPacket.header.senderID = g_network->getPeerID();
-            colorPacket.count = (uint32_t)std::min(colors.size(), (size_t)200);
-            for (uint32_t i = 0; i < colorPacket.count; i++){
-                colorPacket.colorDat[i] = colors[i];
-            }
-
-            g_network->sendPacket(&colorPacket, sizeof(colorPacket));
-        }*/
-
         g_sync->updateLocks(dt);
     }
 
@@ -391,5 +377,15 @@ class $modify(MyEditorUI, EditorUI) {
         tracked.clear();
         
         EditorUI::deselectAll();
+    }
+};
+
+class $modify(ColorSelectPopup) {
+    void colorValueChanged(ccColor3B color) {
+        ColorSelectPopup::colorValueChanged(color);
+
+        if (g_isInSession && g_sync && !g_sync->isApplyingRemoteChanges() && m_colorAction) {
+            g_sync->syncColorAction(m_colorAction);
+        }
     }
 };

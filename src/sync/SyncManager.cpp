@@ -294,6 +294,8 @@ void SyncManager::sendFullState(uint32_t targetPeerID) {
 
     onLocalLevelSettingsChanged();
 
+    
+
     FullSyncEndPacket endPkt;
     endPkt.header.type = PacketType::FULL_SYNC_END;
     endPkt.header.timestamp = getCurrentTimestamp();
@@ -475,11 +477,18 @@ void SyncManager::handlePacket(const uint8_t* data, size_t size) {
             break;
         }
         case PacketType::COLOR_SYNC: {
-            if (size < sizeof(ColorChannelsPacket)) break;
+            if (size < offsetof(ColorChannelsPacket, colorDat)) break;
             const ColorChannelsPacket* packet = reinterpret_cast<const ColorChannelsPacket*>(data);
             if (packet->count > 200) break;
+            size_t expectedSize = offsetof(ColorChannelsPacket, colorDat) + packet->count * sizeof(SavedColorData);
+            if (size < expectedSize) break;
             std::vector<SavedColorData> colors(packet->colorDat, packet->colorDat + packet->count);
-            restoreColorChannels(getEditorLayer(), colors);
+
+            for (auto i : colors)
+            {
+                restoreColor(i);
+            }
+            
             break;
         }
         case PacketType::SELECT_CHANGE: {
@@ -1051,7 +1060,7 @@ void SyncManager::cleanUpPlayers() {
     m_lastPlayerSendTime = 0.0f;
 }
 
-void SyncManager::clearAllRemoteState() {
+void SyncManager::clearAllRemoteState(){
     for (auto& [userId, highlights] : m_remoteSelectionHighlights) {
         for (auto sprite : highlights){
             if (sprite){
@@ -1077,45 +1086,60 @@ void SyncManager::clearAllRemoteState() {
     MouseTooltip::get()->clear();
 }
 
-std::vector<SavedColorData> SyncManager::saveAllColorChannels(LevelEditorLayer* editorLayer) {
-    std::vector<SavedColorData> savedColors;
-    if (!editorLayer || !editorLayer->m_effectManager) return savedColors;
-
-    auto effectManager = editorLayer->m_effectManager;
-
-    for (ColorActionSprite* action : effectManager->m_colorActionSpriteVector) {
-        if (!action || action->m_colorID <= 0) continue;
-
-        ColorAction* colorAction = action->m_colorAction;
-        if (!colorAction) continue;
-
-        SavedColorData data;
-        data.colorID = action->m_colorID;
-        data.color = colorAction->m_color;
-        data.blending = colorAction->m_blending;
-        data.opacity = colorAction->m_currentOpacity;
-        data.copyID = colorAction->m_copyID;
-
-        savedColors.push_back(data);
-    }
-
-    return savedColors;
+GJEffectManager* SyncManager::getActiveEffectManager(){
+    if (auto pl = PlayLayer::get()) return pl->m_effectManager;
+    if (auto lel = LevelEditorLayer::get()) return lel->m_effectManager;
+    return nullptr;
 }
 
-void SyncManager::restoreColorChannels(LevelEditorLayer* editorLayer, const std::vector<SavedColorData>& savedColors) {
-    if (!editorLayer || !editorLayer->m_effectManager) return;
+void SyncManager::restoreColor(SavedColorData ColorData) {
+    auto mgr = getActiveEffectManager();
+    if (!mgr) return;
 
-    auto effectManager = editorLayer->m_effectManager;
+    auto action = ColorAction::create({ColorData.r, ColorData.g, ColorData.b}, ColorData.blending, -1);
+    action->m_colorID = ColorData.colorID;
+    action->m_currentOpacity = ColorData.opacity;
+    action->m_copyID= ColorData.copyID;
 
-    for (const auto& data : savedColors) {
-        ColorAction* colorAction = effectManager->getColorAction(data.colorID);
-        if (!colorAction) continue;
+    m_applyingRemoteChanges = true;
+    mgr->setColorAction(action, ColorData.colorID);
+    m_applyingRemoteChanges = false;
+}
 
-        colorAction->m_color = data.color;
-        colorAction->m_blending = data.blending;
-        colorAction->m_currentOpacity = data.opacity;
-        colorAction->m_copyID = data.copyID;
+std::unordered_map<int, ccColor3B> SyncManager::getAllChannelColors() {
+    std::unordered_map<int, ccColor3B> result;
+    auto mgr = getActiveEffectManager();
+    if (!mgr) return result;
 
-        effectManager->updateColorAction(colorAction);
+    auto actions = mgr->getAllColorActions();
+    if (!actions) return result;
+
+    for (auto action : CCArrayExt<ColorAction*>(actions)) {
+        result[action->m_colorID] = action->m_fromColor;
     }
+
+    return result;
+}
+
+void SyncManager::syncColorAction(ColorAction* action){
+    auto newColor = action->m_fromColor;
+
+    SavedColorData data;
+    data.colorID = action->m_colorID;
+    data.r = newColor.r;
+    data.g = newColor.g;
+    data.b = newColor.b;
+    data.blending = action->m_blending ? 1 : 0;
+    data.opacity = action->m_currentOpacity;
+    data.copyID = action->m_copyID;
+
+    ColorChannelsPacket packet{};
+    packet.header.type = PacketType::COLOR_SYNC;
+    packet.header.timestamp = getCurrentTimestamp();
+    packet.header.senderID = g_network->getPeerID();
+    packet.count = 1;
+    packet.colorDat[0] = data;
+    
+    size_t sendSize = offsetof(ColorChannelsPacket, colorDat) + packet.count * sizeof(SavedColorData);
+    g_network->sendPacket(&packet, sendSize);
 }

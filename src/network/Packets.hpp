@@ -9,14 +9,6 @@
 
 const int maxPlayers = 128;
 
-struct SavedColorData {
-    int colorID;
-    cocos2d::ccColor3B color;
-    bool blending;
-    float opacity;
-    int copyID;
-};
-
 enum class PacketType : uint8_t {
     HANDSHAKE = 0,
     FULL_SYNC = 1,
@@ -37,6 +29,16 @@ enum class PacketType : uint8_t {
 };
 
 #pragma pack(push, 1)
+
+struct SavedColorData {
+    int32_t colorID;
+    uint8_t r;
+    uint8_t g;
+    uint8_t b;
+    uint8_t blending;
+    float opacity;
+    int32_t copyID;
+};
 
 struct PacketHeader{
     PacketType type;

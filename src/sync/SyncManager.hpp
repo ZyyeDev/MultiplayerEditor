@@ -4,6 +4,7 @@
 #include <map>
 #include <string>
 #include <unordered_set>
+#include <unordered_map>
 #include <algorithm>
 
 #include "../network/Packets.hpp"
@@ -127,7 +128,10 @@ class SyncManager{
         void clearAllRemoteState();
 
         uint32_t getUserID() { return SyncManager::m_userID; }
-        
-        std::vector<SavedColorData> saveAllColorChannels(LevelEditorLayer* editorLayer);
-        void restoreColorChannels(LevelEditorLayer* editorLayer, const std::vector<SavedColorData>& savedColors);
+
+        // color stuff
+        GJEffectManager* getActiveEffectManager();
+        void restoreColor(SavedColorData ColorData);
+        std::unordered_map<int, ccColor3B> getAllChannelColors();
+        void syncColorAction(ColorAction* action);
 };

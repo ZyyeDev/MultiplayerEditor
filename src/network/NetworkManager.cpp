@@ -164,6 +164,7 @@ void NetworkManager::poll(){
             
             sendPacket(&packet, sizeof(packet));
             log::info("sent handshake with senderID {}", packet.header.senderID);
+            m_pendingHandshake = false;
             if (m_onConnect) m_onConnect(m_connectId);
         }
         if (m_pendingKick){
