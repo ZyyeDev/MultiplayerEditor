@@ -48,7 +48,7 @@ void try_add_object(auto obj){
             }
             
             if (!isUIElement) {
-                try_add_object(obj);
+                g_sync->onLocalObjectAdded(obj);
             }
         }
     }

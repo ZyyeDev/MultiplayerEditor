@@ -177,12 +177,6 @@ void SyncManager::onRemoteObjectDestroyed(const ObjectDeletePacket& packet) {
     }
     MouseTooltip::get()->unregisterRegion(obj);
 
-    // no crashes (i hope)
-    if (m_localObjects.count(obj)) {
-        if (editor->m_undoObjects) editor->m_undoObjects->removeAllObjects();
-        if (editor->m_redoObjects) editor->m_redoObjects->removeAllObjects();
-    }
-    
     m_localObjects.erase(obj);
     untrackObject(packet.uid);
     
@@ -293,8 +287,6 @@ void SyncManager::sendFullState(uint32_t targetPeerID) {
     }
 
     onLocalLevelSettingsChanged();
-
-    
 
     FullSyncEndPacket endPkt;
     endPkt.header.type = PacketType::FULL_SYNC_END;
@@ -778,6 +770,8 @@ void SyncManager::applyLevelSettings(const LevelSettingsPacket& settings) {
     if (!saveStr.empty() && editor->m_levelSettings) {
         auto* newSettings = LevelSettingsObject::objectFromString(saveStr);
         if (newSettings) {
+            editor->m_levelString = saveStr;
+
             editor->m_levelSettings->m_startMode = newSettings->m_startMode;
             editor->m_levelSettings->m_startSpeed = newSettings->m_startSpeed;
             editor->m_levelSettings->m_startMini = newSettings->m_startMini;
