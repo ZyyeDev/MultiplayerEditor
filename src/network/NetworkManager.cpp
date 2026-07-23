@@ -3,7 +3,53 @@
 #include <Geode/Geode.hpp>
 #include <Geode/binding/GJAccountManager.hpp>
 
+#ifdef _WIN32
+#include <winsock2.h>
+#include <ws2tcpip.h>
+#else
+#include <sys/socket.h>
+#include <netinet/in.h>
+#include <arpa/inet.h>
+#include <unistd.h>
+#endif
+
 using namespace geode::prelude;
+
+std::string NetworkManager::getLocalIP() {
+    int sock = static_cast<int>(socket(AF_INET, SOCK_DGRAM, 0));
+    if (sock < 0) return "127.0.0.1";
+
+    sockaddr_in target{};
+    target.sin_family = AF_INET;
+    target.sin_port = htons(53);
+    inet_pton(AF_INET, "8.8.8.8", &target.sin_addr);
+
+    if (::connect(sock, reinterpret_cast<sockaddr*>(&target), sizeof(target)) != 0) {
+#ifdef _WIN32
+        closesocket(sock);
+#else
+        close(sock);
+#endif
+        return "127.0.0.1";
+    }
+
+    sockaddr_in local{};
+    socklen_t len = sizeof(local);
+    std::string result = "127.0.0.1";
+    if (getsockname(sock, reinterpret_cast<sockaddr*>(&local), &len) == 0) {
+        char buf[INET_ADDRSTRLEN] = {0};
+        if (inet_ntop(AF_INET, &local.sin_addr, buf, sizeof(buf))) {
+            result = buf;
+        }
+    }
+
+#ifdef _WIN32
+    closesocket(sock);
+#else
+    close(sock);
+#endif
+    return result;
+}
 
 NetworkManager::NetworkManager() : m_host(nullptr), m_peer(nullptr), m_isHost(false) {}
 

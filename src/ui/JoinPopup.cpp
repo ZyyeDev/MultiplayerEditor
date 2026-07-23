@@ -27,7 +27,7 @@ bool JoinPopup::init(){
     auto winSize = this->m_mainLayer->getContentSize();
 
     // IP input
-    auto ipLabel = CCLabelBMFont::create("Host IP:","bigFont.fnt");
+    auto ipLabel = CCLabelBMFont::create("Host's IP:","bigFont.fnt");
     ipLabel->setScale(0.5f);
     ipLabel->setPosition(ccp(
         winSize.width/2,
@@ -44,7 +44,7 @@ bool JoinPopup::init(){
     this->m_mainLayer->addChild(m_ipInput);
 
     // port input
-    auto portLabel = CCLabelBMFont::create("Port:","bigFont.fnt");
+    auto portLabel = CCLabelBMFont::create("Port (must match host):","bigFont.fnt");
     portLabel->setScale(0.5f);
     portLabel->setPosition(ccp(
         winSize.width/2,

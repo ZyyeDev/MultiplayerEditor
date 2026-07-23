@@ -35,6 +35,8 @@ class NetworkManager{
         void relayPacket(uint32_t excludePeerID, const void* data, size_t size);
         void poll();
 
+        static std::string getLocalIP();
+
         void setOnRecive(std::function<void(const uint8_t*, size_t)> callback);
         void setOnConnect(std::function<void(uint32_t)> callback);
         void setOnDisconnect(std::function<void()> callback);

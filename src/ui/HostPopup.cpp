@@ -25,7 +25,7 @@ bool HostPopup::init(){
     auto winSize = this->m_mainLayer->getContentSize();
 
     // ip label
-    m_ipLabel = CCLabelBMFont::create("(Host To Show IP)","chatFont.fnt");
+    m_ipLabel = CCLabelBMFont::create("(Start hosting to see your IP)","chatFont.fnt");
     m_ipLabel->setScale(.6f);
     m_ipLabel->setPosition(ccp(
         winSize.width/2,
@@ -34,7 +34,7 @@ bool HostPopup::init(){
     this->m_mainLayer->addChild(m_ipLabel);
 
     // help label
-    m_helpLabel = CCLabelBMFont::create("Give your hamachi or public ip, NOT THE LOCAL ONE \n (THE IP ABOVE THIS IS THE LOCAL IP)","goldFont.fnt");
+    m_helpLabel = CCLabelBMFont::create("Same WiFi/network: others type the IP and PORT above.\nDifferent network: port-forward this port and share your public IP instead.\nUsing Hamachi/Playit/similar: share the address IT gives you, not this one.","goldFont.fnt");
     m_helpLabel->setScale(.4f);
     m_helpLabel->setPosition(ccp(
         winSize.width/2,
@@ -44,7 +44,7 @@ bool HostPopup::init(){
     this->m_mainLayer->addChild(m_helpLabel);
     
     if (g_isHost && g_isInSession){
-        std::string ipStr = "127.0.0.1:" + std::to_string(g_network->m_port);
+        std::string ipStr = NetworkManager::getLocalIP() + ":" + std::to_string(g_network->m_port);
         m_ipLabel->setString(ipStr.c_str());
         m_helpLabel->setVisible(true);
     }
@@ -157,9 +157,7 @@ void HostPopup::onStartHost(CCObject*){
 
         g_sync->setUserID(g_network->getPeerID());
 
-        // for now, just show local ip
-        // it should show local ip, or hamachi ip (or whatever the user is using)
-        std::string ipStr = "127.0.0.1:" + std::to_string(port);
+        std::string ipStr = NetworkManager::getLocalIP() + ":" + std::to_string(port);
         m_ipLabel->setString(ipStr.c_str());
         m_helpLabel->setVisible(true);
 
