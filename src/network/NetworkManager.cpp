@@ -119,8 +119,35 @@ void NetworkManager::sendPacket(const void* data, size_t size){
         }
         enet_host_broadcast(m_host, 0, packet);
     } else {
-        if (!m_peer) return;
-        enet_peer_send(m_peer, 0, packet);
+        if (!m_peer) {
+            enet_packet_destroy(packet);
+            return;
+        }
+        if (enet_peer_send(m_peer, 0, packet) < 0) {
+            log::warn("enet_peer_send failed, packet dropped (size {})", size);
+            if (packet->referenceCount == 0) enet_packet_destroy(packet);
+        }
+    }
+}
+
+void NetworkManager::relayPacket(uint32_t excludePeerID, const void* data, size_t size){
+    if (!m_isHost || m_connectedPeers.empty()) return;
+
+    ENetPacket* packet = enet_packet_create(data, size, ENET_PACKET_FLAG_RELIABLE);
+    if (!packet) return;
+
+    bool sentToAny = false;
+    for (auto& [peerID, peer] : m_connectedPeers){
+        if (peerID == excludePeerID || !peer) continue;
+        if (enet_peer_send(peer, 0, packet) == 0) {
+            sentToAny = true;
+        } else {
+            log::warn("relayPacket: enet_peer_send to peer {} failed", peerID);
+        }
+    }
+
+    if (!sentToAny && packet->referenceCount == 0) {
+        enet_packet_destroy(packet);
     }
 }
 
@@ -135,7 +162,10 @@ void NetworkManager::sendPacketToPeer(uint32_t peerID, const void* data, size_t 
     }
     ENetPacket* packet = enet_packet_create(data, size, ENET_PACKET_FLAG_RELIABLE);
     if (!packet) return;
-    enet_peer_send(it->second, 0, packet);
+    if (enet_peer_send(it->second, 0, packet) < 0) {
+        log::warn("enet_peer_send to peer {} failed, packet dropped (size {})", peerID, size);
+        if (packet->referenceCount == 0) enet_packet_destroy(packet);
+    }
 }
 
 void NetworkManager::poll(){

@@ -1,6 +1,7 @@
 #include <Geode/Geode.hpp>
 #include <sstream>
 #include <cstring>
+#include <cstddef>
 #include "SyncManager.hpp"
 #include "../network/NetworkManager.hpp"
 #include "../network/Packets.hpp"
@@ -76,7 +77,7 @@ void SyncManager::sendObjectPackets(PacketType type, const std::string& uid, con
         memcpy(packet.objectString, objString.c_str() + offset, thisChunkLen);
         if (thisChunkLen < chunkSize) packet.objectString[thisChunkLen] = '\0';
 
-        g_network->sendPacket(&packet, sizeof(packet));
+        g_network->sendPacket(&packet, offsetof(ObjectStringPacket, objectString) + thisChunkLen);
 
         offset += thisChunkLen;
         chunkIndex++;
@@ -90,7 +91,8 @@ void SyncManager::onLocalObjectAdded(GameObject* obj) {
     trackObject(uid, obj);
     m_localObjects.insert(obj);
     
-    gd::string gdString = obj->getSaveString(nullptr);
+    auto editor = getEditorLayer();
+    gd::string gdString = obj->getSaveString(editor);
     std::string objString = std::string(gdString);
     
     sendObjectPackets(PacketType::OBJECT_ADD, uid, objString);
@@ -126,7 +128,8 @@ void SyncManager::onLocalObjectModified(GameObject* obj) {
     
     std::string uid = getObjectUid(obj);
     
-    gd::string gdString = obj->getSaveString(nullptr);
+    auto editor = getEditorLayer();
+    gd::string gdString = obj->getSaveString(editor);
     std::string objString = std::string(gdString);
     
     sendObjectPackets(PacketType::OBJECT_UPDATE, uid, objString);
@@ -140,24 +143,35 @@ void SyncManager::onRemoteObjectAdded(const std::string& uid, const std::string&
     }
     
     m_applyingRemoteChanges = true;
-    
-    int countBefore = editor->m_objects ? editor->m_objects->count() : 0;
-    
-    editor->createObjectsFromString(objString, false, false);
-    
-    int countAfter = editor->m_objects ? editor->m_objects->count() : 0;
-    if (countAfter > countBefore) {
-        GameObject* newObj = static_cast<GameObject*>(
-            editor->m_objects->objectAtIndex(countAfter - 1)
-        );
-        
+
+    std::unordered_set<GameObject*> before;
+    if (editor->m_objects) {
+        before.reserve(editor->m_objects->count());
+        for (int i = 0; i < editor->m_objects->count(); i++) {
+            before.insert(static_cast<GameObject*>(editor->m_objects->objectAtIndex(i)));
+        }
+    }
+
+    editor->createObjectsFromString(objString, false, true);
+
+    GameObject* newObj = nullptr;
+    if (editor->m_objects) {
+        for (int i = 0; i < editor->m_objects->count(); i++) {
+            auto obj = static_cast<GameObject*>(editor->m_objects->objectAtIndex(i));
+            if (before.find(obj) == before.end()) {
+                newObj = obj;
+                break;
+            }
+        }
+    }
+
+    if (newObj) {
         trackObject(uid, newObj);
-        
         log::info("created object: {}", uid);
     } else {
-        log::error("object creation failed!");
+        log::error("object creation failed for uid: {}", uid);
     }
-    
+
     m_applyingRemoteChanges = false;
 }
 
@@ -212,15 +226,25 @@ void SyncManager::onRemoteObjectModified(const std::string& uid, const std::stri
         editor->removeObject(oldObj, false);
     }
     untrackObject(uid);
-    
-    int countBefore = editor->m_objects->count();
-    editor->createObjectsFromString(objString, false, false);
-    
-    int countAfter = editor->m_objects->count();
-    if (countAfter > countBefore) {
-        GameObject* newObj = static_cast<GameObject*>(
-            editor->m_objects->objectAtIndex(countAfter - 1)
-        );
+
+    std::unordered_set<GameObject*> before;
+    before.reserve(editor->m_objects->count());
+    for (int i = 0; i < editor->m_objects->count(); i++) {
+        before.insert(static_cast<GameObject*>(editor->m_objects->objectAtIndex(i)));
+    }
+
+    editor->createObjectsFromString(objString, false, true);
+
+    GameObject* newObj = nullptr;
+    for (int i = 0; i < editor->m_objects->count(); i++) {
+        auto obj = static_cast<GameObject*>(editor->m_objects->objectAtIndex(i));
+        if (before.find(obj) == before.end()) {
+            newObj = obj;
+            break;
+        }
+    }
+
+    if (newObj) {
         trackObject(uid, newObj);
     } else {
         log::error("object update failed for uid: {}", uid);
@@ -252,7 +276,7 @@ void SyncManager::sendFullState(uint32_t targetPeerID) {
             trackObject(uid, obj);
         }
 
-        gd::string gdString = obj->getSaveString(nullptr);
+        gd::string gdString = obj->getSaveString(editor);
         std::string objString = std::string(gdString);
         std::string uid = getObjectUid(obj);
 
@@ -277,7 +301,7 @@ void SyncManager::sendFullState(uint32_t targetPeerID) {
             memcpy(pkt.objectString, objString.c_str() + offset, thisChunkLen);
             if (thisChunkLen < chunkSize) pkt.objectString[thisChunkLen] = '\0';
 
-            g_network->sendPacketToPeer(targetPeerID, &pkt, sizeof(pkt));
+            g_network->sendPacketToPeer(targetPeerID, &pkt, offsetof(ObjectStringPacket, objectString) + thisChunkLen);
 
             offset += thisChunkLen;
             chunkIndex++;
@@ -301,6 +325,22 @@ void SyncManager::handlePacket(const uint8_t* data, size_t size) {
     if (size < sizeof(PacketHeader)) return;
     
     const PacketHeader* header = reinterpret_cast<const PacketHeader*>(data);
+
+    if (g_isHost && header->senderID != g_network->getPeerID()) {
+        switch (header->type) {
+            case PacketType::OBJECT_ADD:
+            case PacketType::OBJECT_DELETE:
+            case PacketType::OBJECT_UPDATE:
+            case PacketType::MOUSE_MOVE:
+            case PacketType::SELECT_CHANGE:
+            case PacketType::COLOR_SYNC:
+            case PacketType::PLAYER_POSITION:
+                g_network->relayPacket(header->senderID, data, size);
+                break;
+            default:
+                break;
+        }
+    }
     
     switch (header->type) {
         case PacketType::HANDSHAKE: {
@@ -425,8 +465,9 @@ void SyncManager::handlePacket(const uint8_t* data, size_t size) {
             break;
         }
         case PacketType::OBJECT_ADD: {
-            if (size < sizeof(ObjectStringPacket)) break;
+            if (size < offsetof(ObjectStringPacket, objectString)) break;
             const ObjectStringPacket* packet = reinterpret_cast<const ObjectStringPacket*>(data);
+            if (size < offsetof(ObjectStringPacket, objectString) + packet->chunkLength) break;
             std::string uid(packet->uid);
 
             if (packet->chunkIndex == 0) m_incomingChunks[uid] = ChunkBuffer{};
@@ -447,8 +488,9 @@ void SyncManager::handlePacket(const uint8_t* data, size_t size) {
             break;
         }
         case PacketType::OBJECT_UPDATE: {
-            if (size < sizeof(ObjectStringPacket)) break;
+            if (size < offsetof(ObjectStringPacket, objectString)) break;
             const ObjectStringPacket* packet = reinterpret_cast<const ObjectStringPacket*>(data);
+            if (size < offsetof(ObjectStringPacket, objectString) + packet->chunkLength) break;
             std::string uid(packet->uid);
 
             if (packet->chunkIndex == 0) m_incomingChunks[uid] = ChunkBuffer{};
@@ -835,6 +877,47 @@ void SyncManager::trackExistingObjects(){
             std::string uid = generateUID();
             trackObject(uid, obj);
         }
+    }
+}
+
+void SyncManager::pruneStaleTrackedObjects() {
+    auto editor = getEditorLayer();
+    if (!editor || !editor->m_objects) return;
+
+    std::unordered_set<GameObject*> editorObjects;
+    editorObjects.reserve(editor->m_objects->count());
+    for (int i = 0; i < editor->m_objects->count(); i++) {
+        editorObjects.insert(static_cast<GameObject*>(editor->m_objects->objectAtIndex(i)));
+    }
+
+    std::vector<std::string> removed;
+    for (auto& [uid, obj] : m_syncedObjects) {
+        if (!editorObjects.count(obj)) {
+            removed.push_back(uid);
+        }
+    }
+
+    if (removed.empty()) return;
+
+    for (auto& uid : removed) {
+        ObjectDeletePacket pkt;
+        pkt.header.type = PacketType::OBJECT_DELETE;
+        pkt.header.timestamp = getCurrentTimestamp();
+        pkt.header.senderID = g_network->getPeerID();
+        strncpy(pkt.uid, uid.c_str(), 31);
+        pkt.uid[31] = '\0';
+        g_network->sendPacket(&pkt, sizeof(pkt));
+
+        m_localObjects.erase(m_syncedObjects[uid]);
+        untrackObject(uid);
+
+        for (auto& [userId, selection] : m_remoteSelections) {
+            selection.erase(uid);
+        }
+    }
+
+    for (auto& [userId, selection] : m_remoteSelections) {
+        onRemoteSelectionChanged(userId);
     }
 }
 

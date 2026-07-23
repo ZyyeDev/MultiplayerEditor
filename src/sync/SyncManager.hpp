@@ -108,6 +108,7 @@ class SyncManager{
         void sendFullState(uint32_t targetPeerID);
         void trackExistingObjects();
         void syncAfterUndoRedo();
+        void pruneStaleTrackedObjects();
 
         /* -- OTHERS -- */
         void handlePacket(const uint8_t* data, size_t size);

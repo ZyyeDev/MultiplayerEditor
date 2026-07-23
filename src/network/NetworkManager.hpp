@@ -32,6 +32,7 @@ class NetworkManager{
 
         void sendPacket(const void* data, size_t size);
         void sendPacketToPeer(uint32_t peerID, const void* data, size_t size);
+        void relayPacket(uint32_t excludePeerID, const void* data, size_t size);
         void poll();
 
         void setOnRecive(std::function<void(const uint8_t*, size_t)> callback);

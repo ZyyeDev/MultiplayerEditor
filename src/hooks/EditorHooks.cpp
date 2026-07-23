@@ -23,8 +23,6 @@ extern NetworkManager* g_network;
 extern bool g_isInSession;
 extern bool g_isHost;
 
-LevelEditorLayer* m_editorUI;
-
 void settingsUpdate(){
     if (g_isInSession && g_sync && g_isHost && !g_sync->isApplyingRemoteChanges()) {
         g_sync->onLocalLevelSettingsChanged();
@@ -33,14 +31,18 @@ void settingsUpdate(){
 
 void try_add_object(auto obj){
     if (g_isInSession && g_sync && !g_sync->isApplyingRemoteChanges()){
+        g_sync->pruneStaleTrackedObjects();
+
         // HACK: Objects in custom objects tab are detected as objects and are being sent
         // even tho they are part of the ui. We dont want to send these!!
-        if (m_editorUI) {
+        auto editor = LevelEditorLayer::get();
+        auto editorUI = editor ? editor->m_editorUI : nullptr;
+        if (editorUI) {
             CCNode* parent = obj->getParent();
             bool isUIElement = false;
             
             while (parent) {
-                if (parent == m_editorUI) {
+                if (parent == editorUI) {
                     isUIElement = true;
                     break;
                 }
@@ -48,8 +50,11 @@ void try_add_object(auto obj){
             }
             
             if (!isUIElement) {
+                log::debug("try_add_object: sending object {}", fmt::ptr((void*)obj));
                 g_sync->onLocalObjectAdded(obj);
             }
+        } else {
+            //log::warn("try_add_object: editorUI is null, object {} was NOT sent!", fmt::ptr((void*)obj));
         }
     }
 }
@@ -144,13 +149,25 @@ class $modify(MyLevelEditorLayer, LevelEditorLayer){
     bool init(GJGameLevel* level, bool noUI) {
         if (!LevelEditorLayer::init(level, noUI)) return false;
         
-        m_editorUI = this->m_editorUI;
-        
         if (g_isInSession && g_network && !g_isHost){
             g_network->requestFullSync = true;
         }
 
-        return true;
+        return true;;
+    }
+
+    GameObject* createObject(int key, CCPoint position, bool noUndo) {
+        auto obj = LevelEditorLayer::createObject(key, position, noUndo);
+
+        if (obj && g_isInSession && g_sync && !g_sync->isApplyingRemoteChanges()) {
+            g_sync->pruneStaleTrackedObjects();
+
+            if (!g_sync->isTrackedObject(obj)) {
+                try_add_object(obj);
+            }
+        }
+
+        return obj;
     }
 };
 
@@ -163,7 +180,11 @@ class $modify(MyGJBaseGameLayer, GJBaseGameLayer) {
         auto editor = LevelEditorLayer::get();
         if (!editor || static_cast<GJBaseGameLayer*>(editor) != this) return;
 
-        if (g_sync->isTrackedObject(obj)) return;
+        g_sync->pruneStaleTrackedObjects();
+
+        if (g_sync->isTrackedObject(obj)) {
+            return;
+        }
 
         try_add_object(obj);
     }
@@ -196,6 +217,14 @@ class $modify(MyEditorUI, EditorUI) {
 
         auto editor = LevelEditorLayer::get();
         if (!editor || !editor->m_objects) return;
+
+        g_sync->pruneStaleTrackedObjects();
+
+        for (auto obj : CCArrayExt<GameObject*>(editor->m_objects)) {
+            if (obj && !g_sync->isTrackedObject(obj)) {
+                try_add_object(obj);
+            }
+        }
 
         auto& tracked = m_fields->m_trackedSelections;
 
