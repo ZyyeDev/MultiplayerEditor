@@ -1,3 +1,7 @@
+# 0.0.4
+- Fixed objects sometimes failing to sync when fast swipe
+- Some ui stuff
+- And more bug/crash fixes im really lazy to mention rn
 # 0.0.3
 - **UPDATED TO GEODE 5**
 - A **_TON_** of bugfixes
