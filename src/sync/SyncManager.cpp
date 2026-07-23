@@ -195,6 +195,15 @@ void SyncManager::onRemoteObjectDestroyed(const ObjectDeletePacket& packet) {
     untrackObject(packet.uid);
     
     m_applyingRemoteChanges = true;
+    if (editor->m_editorUI) {
+        if (editor->m_editorUI->m_selectedObject == obj) {
+            editor->m_editorUI->m_selectedObject = nullptr;
+        }
+        if (editor->m_editorUI->m_selectedObjects && editor->m_editorUI->m_selectedObjects->containsObject(obj)) {
+            editor->m_editorUI->deselectObject(obj);
+            editor->m_editorUI->m_selectedObjects->removeObject(obj);
+        }
+    }
     if (editor->m_objects && editor->m_objects->containsObject(obj)) {
         editor->removeObject(obj, false);
     }
@@ -222,6 +231,15 @@ void SyncManager::onRemoteObjectModified(const std::string& uid, const std::stri
     MouseTooltip::get()->unregisterRegion(oldObj);
 
     m_localObjects.erase(oldObj);
+    if (editor->m_editorUI) {
+        if (editor->m_editorUI->m_selectedObject == oldObj) {
+            editor->m_editorUI->m_selectedObject = nullptr;
+        }
+        if (editor->m_editorUI->m_selectedObjects && editor->m_editorUI->m_selectedObjects->containsObject(oldObj)) {
+            editor->m_editorUI->deselectObject(oldObj);
+            editor->m_editorUI->m_selectedObjects->removeObject(oldObj);
+        }
+    }
     if (editor->m_objects->containsObject(oldObj)) {
         editor->removeObject(oldObj, false);
     }
