@@ -7,8 +7,7 @@ I wanted there to be a free option too, so people who just want to build a level
 
 ## THIS MOD IS EXPERIMENTAL!!
 
-I want to be upfront about this: the mod is still in an early, experimental state. Editor sync is a genuinely messy thing to get right, and while most of the core stuff works, you will probably run into bugs, weird edge cases, or things not syncing quite well. Please make backups of your levels before using this in a real project (i will be implementing an auto backup thing).
-I'm actively working on making it more stable and adding more sync coverage over time, so expect updates that fix things and expand what's supported.
+I want to be upfront about this: the mod is still in an early, experimental state. Editor sync is a genuinely messy thing to get right, and while most of the core stuff works, you will probably run into bugs or things not syncing quite well. Please make backups of your levels before using this in a real project.
 
 If something breaks or doesn't sync properly, let me know, bug reports genuinely help this get better faster.
 
@@ -19,3 +18,7 @@ This mod uses peer to peer networking through [enet](https://github.com/lsalzman
 One person hosts the session and others connect directly to them using their IP address.
 
 Since this is direct P2P, using something like Hamachi or another virtual LAN tool is recommended if you're not on the same network, especially since NAT/port forwarding can be a pain otherwise.
+
+## Thanks
+
+Thanks to [Editor Collab](https://geode-sdk.org/mods/alk.editor-collab) for making the original mod and [enet](https://github.com/lsalzman/enet) for all p2p stuff.
