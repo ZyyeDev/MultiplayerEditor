@@ -7,7 +7,7 @@ A multiplayer Geometry Dash mod for building levels with others, made using [ene
 ## Installation
 
 1. Install [Geode](https://geode-sdk.org/)
-2. Download the latest release from the [Releases page](#)
+2. Download the latest release from the [Releases page](https://github.com/ZyyeDev/MultiplayerEditor/releases/latest)
 3. Place the `.geode` file in your `geode/mods` folder
 4. Launch Geometry Dash
 
