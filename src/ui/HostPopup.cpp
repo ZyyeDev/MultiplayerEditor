@@ -19,7 +19,7 @@ HostPopup* HostPopup::create(){
 }
 
 bool HostPopup::init(){
-    if (!Popup::init(320.0f, 280.0f)) return false;
+    if (!Popup::init(400.0f, 290.0f)) return false;
     this->setTitle("Host Session");
 
     auto winSize = this->m_mainLayer->getContentSize();
@@ -29,7 +29,7 @@ bool HostPopup::init(){
     m_ipLabel->setScale(.6f);
     m_ipLabel->setPosition(ccp(
         winSize.width/2,
-        winSize.height/2 + 90
+        winSize.height/2 + 105
     ));
     this->m_mainLayer->addChild(m_ipLabel);
 
@@ -38,7 +38,7 @@ bool HostPopup::init(){
     m_helpLabel->setScale(.4f);
     m_helpLabel->setPosition(ccp(
         winSize.width/2,
-        winSize.height/2 + 75
+        winSize.height/2 + 85
     ));
     m_helpLabel->setVisible(false);
     this->m_mainLayer->addChild(m_helpLabel);

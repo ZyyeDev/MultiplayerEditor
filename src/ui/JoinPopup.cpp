@@ -36,7 +36,7 @@ bool JoinPopup::init(){
     this->m_mainLayer->addChild(ipLabel);
 
     m_ipInput = TextInput::create(200.0f, "127.0.0.1", "chatFont.fnt");
-    m_ipInput->setFilter("qwertyuiopasdfghjklzxcvbnm1234567890.");
+    m_ipInput->setFilter("qwertyuiopasdfghjklzxcvbnm1234567890,.-@!_");
     m_ipInput->setPosition(ccp(
         winSize.width/2,
         winSize.height/2 + 60
