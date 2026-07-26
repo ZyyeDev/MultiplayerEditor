@@ -61,6 +61,9 @@ class SyncManager{
         std::string extractSettingsString();
         void applySettingsString(const char* str, uint32_t len);
         void applyLevelSettings(LevelSettingsPacket const& settings);
+        bool isPopupBlockingLevelSettings();
+        bool m_hasPendingLevelSettings = false;
+        LevelSettingsPacket m_pendingLevelSettings;
 
         /* -- PLAYER SYNC -- */
         std::map<uint32_t, RemotePlayer> m_remotePlayers;
@@ -127,6 +130,8 @@ class SyncManager{
 
         void cleanUpPlayers();
         void clearAllRemoteState();
+
+        void processPendingLevelSettings();
 
         uint32_t getUserID() { return SyncManager::m_userID; }
 

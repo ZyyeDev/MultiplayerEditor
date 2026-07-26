@@ -65,6 +65,8 @@ class $modify(CCScheduler) {
         }
 
         if (g_isInSession && g_sync){
+            g_sync->processPendingLevelSettings();
+
             auto editorLayer = LevelEditorLayer::get();
             if (editorLayer && editorLayer->m_objectLayer){
                 if (g_isInSession && g_sync && editorLayer->m_playbackMode == PlaybackMode::Playing) {

@@ -427,6 +427,15 @@ void SyncManager::handlePacket(const uint8_t* data, size_t size) {
             onRemoteSelectionChanged(packet->userToKick);
             m_remoteSelections.erase(packet->userToKick);
             m_remoteSelectionHighlights.erase(packet->userToKick);
+            {
+                auto cursorIt = m_remoteCursors.find(packet->userToKick);
+                if (cursorIt != m_remoteCursors.end()) {
+                    if (cursorIt->second && cursorIt->second->getParent()) {
+                        cursorIt->second->removeFromParent();
+                    }
+                    m_remoteCursors.erase(cursorIt);
+                }
+            }
             log::info("peer left {}", packet->userToKick);
             break;
         }
@@ -445,6 +454,15 @@ void SyncManager::handlePacket(const uint8_t* data, size_t size) {
             onRemoteSelectionChanged(packet->peerID);
             m_remoteSelections.erase(packet->peerID);
             m_remoteSelectionHighlights.erase(packet->peerID);
+            {
+                auto cursorIt = m_remoteCursors.find(packet->peerID);
+                if (cursorIt != m_remoteCursors.end()) {
+                    if (cursorIt->second && cursorIt->second->getParent()) {
+                        cursorIt->second->removeFromParent();
+                    }
+                    m_remoteCursors.erase(cursorIt);
+                }
+            }
             log::info("peer left {}", packet->peerID);
             break;
         }
@@ -813,10 +831,39 @@ std::string SyncManager::extractSettingsString() {
     return std::string(gs);
 }
 
+bool SyncManager::isPopupBlockingLevelSettings() {
+    auto scene = CCDirector::sharedDirector()->getRunningScene();
+    if (!scene) return false;
+
+    if (auto transition = typeinfo_cast<CCTransitionScene*>(scene)) {
+        scene = transition->m_pInScene ? transition->m_pInScene : scene;
+    }
+
+    for (auto child : CCArrayExt<CCNode*>(scene->getChildren())) {
+        if (typeinfo_cast<FLAlertLayer*>(child)) return true;
+    }
+
+    return false;
+}
+
 void SyncManager::onRemoteLevelSettingsChanged(const LevelSettingsPacket& packet) {
     if (g_isHost) return;
-    
+
+    if (isPopupBlockingLevelSettings()) {
+        m_pendingLevelSettings = packet;
+        m_hasPendingLevelSettings = true;
+        return;
+    }
+
     applyLevelSettings(packet);
+}
+
+void SyncManager::processPendingLevelSettings() {
+    if (!m_hasPendingLevelSettings) return;
+    if (isPopupBlockingLevelSettings()) return;
+
+    m_hasPendingLevelSettings = false;
+    applyLevelSettings(m_pendingLevelSettings);
 }
 
 void SyncManager::applyLevelSettings(const LevelSettingsPacket& settings) {
@@ -879,6 +926,15 @@ void SyncManager::onLocalLevelSettingsChanged() {
     packet.settingsLength = (uint32_t)std::min(settingsStr.size(), sizeof(packet.settingsString) - 1);
     memcpy(packet.settingsString, settingsStr.c_str(), packet.settingsLength);
     packet.settingsString[packet.settingsLength] = '\0';
+
+    packet.audioTrack = 0;
+    packet.songID = 0;
+    packet.levelLength = 0;
+    if (editorLayer->m_level) {
+        packet.audioTrack = editorLayer->m_level->m_audioTrack;
+        packet.songID = editorLayer->m_level->m_songID;
+        packet.levelLength = editorLayer->m_level->m_levelLength;
+    }
 
     g_network->sendPacket(&packet, sizeof(packet));
 }

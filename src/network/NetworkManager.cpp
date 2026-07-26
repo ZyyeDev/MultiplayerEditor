@@ -116,6 +116,7 @@ bool NetworkManager::connect(const std::string& ip, uint16_t port, const std::st
         m_isHost = false;
         m_password = password;
         m_connectId = event.peer->connectID;
+        m_peer = event.peer;
 
         m_pendingHandshake = true;
         
