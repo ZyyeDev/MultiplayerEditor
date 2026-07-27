@@ -45,6 +45,10 @@ class SyncManager{
         };
         std::map<std::string, ChunkBuffer> m_incomingChunks;
 
+        /* -- COALESCED OBJECT UPDATES -- */
+        std::map<std::string, std::string> m_pendingObjectUpdates;
+        void flushPendingObjectUpdates();
+
         void sendObjectPackets(PacketType type, const std::string& uid, const std::string& objString);
 
         /* -- LOCAL OBJECT OWNERSHIP (for undo thingy) -- */

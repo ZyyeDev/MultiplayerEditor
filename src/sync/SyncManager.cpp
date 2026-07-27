@@ -534,7 +534,8 @@ void SyncManager::handlePacket(const uint8_t* data, size_t size) {
             if (!packet->hasMore) {
                 std::string fullString = m_incomingChunks[uid].data;
                 m_incomingChunks.erase(uid);
-                onRemoteObjectModified(uid, fullString);
+                
+                m_pendingObjectUpdates[uid] = fullString;
             }
             break;
         }
@@ -699,6 +700,8 @@ bool SyncManager::isObjectLockedByOther(GameObject* obj, uint32_t* outUserID){
 }
 
 void SyncManager::updateLocks(float dt){
+    flushPendingObjectUpdates();
+
     for (auto& [userId, selection] : m_remoteSelections){
         std::vector<std::string> expired;
         for (auto& [uid, ttl] : selection){
@@ -708,6 +711,17 @@ void SyncManager::updateLocks(float dt){
         bool changed = !expired.empty();
         for (auto& uid : expired) selection.erase(uid);
         if (changed) onRemoteSelectionChanged(userId);
+    }
+}
+
+void SyncManager::flushPendingObjectUpdates(){
+    if (m_pendingObjectUpdates.empty()) return;
+
+    auto batch = std::move(m_pendingObjectUpdates);
+    m_pendingObjectUpdates.clear();
+
+    for (auto& [uid, objString] : batch){
+        onRemoteObjectModified(uid, objString);
     }
 }
 
@@ -1238,6 +1252,7 @@ void SyncManager::clearAllRemoteState(){
     m_syncedObjects.clear();
     m_localObjects.clear();
     m_incomingChunks.clear();
+    m_pendingObjectUpdates.clear();
 
     MouseTooltip::get()->clear();
 }
