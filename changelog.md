@@ -1,3 +1,7 @@
+# 0.0.5
+- Added more characters on the ip address
+- Fix ui
+- Bug fixes
 # 0.0.4
 - Fixed objects sometimes failing to sync when fast swipe
 - Some ui stuff
