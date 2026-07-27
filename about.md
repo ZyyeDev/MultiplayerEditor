@@ -19,6 +19,8 @@ One person hosts the session and others connect directly to them using their IP 
 
 Since this is direct P2P, using something like Hamachi or another virtual LAN tool is recommended if you're not on the same network, especially since NAT/port forwarding can be a pain otherwise.
 
+If you are using something like playit.gg make sure to use UDP!!
+
 ## Thanks
 
 Thanks to [Editor Collab](https://geode-sdk.org/mods/alk.editor-collab) for making the original mod and [enet](https://github.com/lsalzman/enet) for all p2p stuff.

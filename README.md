@@ -11,7 +11,7 @@ A multiplayer Geometry Dash mod for building levels with others, made using [ene
 3. Place the `.geode` file in your `geode/mods` folder
 4. Launch Geometry Dash
 
-This mod uses **P2P**, we recommend to use [Hamachi](https://vpn.net/) or similar to create a virtual LAN, or you can also use [playit.gg](https://playit.gg/).
+This mod uses **P2P**, we recommend to use [Hamachi](https://vpn.net/) or similar to create a virtual LAN, or you can also use [playit.gg](https://playit.gg/) (Make sure to use UDP!!).
 
 ## Contributing
 
