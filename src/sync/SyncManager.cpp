@@ -35,6 +35,29 @@ void SyncManager::untrackObject(const std::string& uid){
     }
 }
 
+GameObject* SyncManager::createAndDiffObjectFromString(LevelEditorLayer* editor, const std::string& objString){
+    if (!editor) return nullptr;
+
+    std::unordered_set<GameObject*> before;
+    if (editor->m_objects) {
+        before.reserve(editor->m_objects->count());
+        for (int i = 0; i < editor->m_objects->count(); i++) {
+            before.insert(static_cast<GameObject*>(editor->m_objects->objectAtIndex(i)));
+        }
+    }
+
+    editor->createObjectsFromString(objString, false, true);
+
+    if (!editor->m_objects) return nullptr;
+    for (int i = 0; i < editor->m_objects->count(); i++) {
+        auto obj = static_cast<GameObject*>(editor->m_objects->objectAtIndex(i));
+        if (before.find(obj) == before.end()) {
+            return obj;
+        }
+    }
+    return nullptr;
+}
+
 bool SyncManager::isTrackedObject(GameObject* obj){
     return m_objectToUID.find(obj) != m_objectToUID.end();
 }
@@ -144,26 +167,7 @@ void SyncManager::onRemoteObjectAdded(const std::string& uid, const std::string&
     
     m_applyingRemoteChanges = true;
 
-    std::unordered_set<GameObject*> before;
-    if (editor->m_objects) {
-        before.reserve(editor->m_objects->count());
-        for (int i = 0; i < editor->m_objects->count(); i++) {
-            before.insert(static_cast<GameObject*>(editor->m_objects->objectAtIndex(i)));
-        }
-    }
-
-    editor->createObjectsFromString(objString, false, true);
-
-    GameObject* newObj = nullptr;
-    if (editor->m_objects) {
-        for (int i = 0; i < editor->m_objects->count(); i++) {
-            auto obj = static_cast<GameObject*>(editor->m_objects->objectAtIndex(i));
-            if (before.find(obj) == before.end()) {
-                newObj = obj;
-                break;
-            }
-        }
-    }
+    GameObject* newObj = createAndDiffObjectFromString(editor, objString);
 
     if (newObj) {
         trackObject(uid, newObj);
@@ -245,22 +249,7 @@ void SyncManager::onRemoteObjectModified(const std::string& uid, const std::stri
     }
     untrackObject(uid);
 
-    std::unordered_set<GameObject*> before;
-    before.reserve(editor->m_objects->count());
-    for (int i = 0; i < editor->m_objects->count(); i++) {
-        before.insert(static_cast<GameObject*>(editor->m_objects->objectAtIndex(i)));
-    }
-
-    editor->createObjectsFromString(objString, false, true);
-
-    GameObject* newObj = nullptr;
-    for (int i = 0; i < editor->m_objects->count(); i++) {
-        auto obj = static_cast<GameObject*>(editor->m_objects->objectAtIndex(i));
-        if (before.find(obj) == before.end()) {
-            newObj = obj;
-            break;
-        }
-    }
+    GameObject* newObj = createAndDiffObjectFromString(editor, objString);
 
     if (newObj) {
         trackObject(uid, newObj);

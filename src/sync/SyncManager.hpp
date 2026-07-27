@@ -26,6 +26,8 @@ class SyncManager{
         void trackObject(const std::string& uid, GameObject* obj);
         void untrackObject(const std::string& uid);
 
+        GameObject* createAndDiffObjectFromString(LevelEditorLayer* editor, const std::string& objString);
+
         std::string generateUID();
 
         bool shouldApplyUpdate(uint32_t remoteTimestamp);
