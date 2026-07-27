@@ -253,11 +253,7 @@ void NetworkManager::poll(){
 
             disconnect();
 
-            auto scene = CCScene::create();
-            auto menuLayer = MenuLayer::create();
-            scene->addChild(menuLayer);
-
-            CCDirector::sharedDirector()->replaceScene(CCTransitionFade::create(0.5f,scene));
+            CCDirector::sharedDirector()->replaceScene(CCTransitionFade::create(0.5f, MenuLayer::scene(false)));
 
             FLAlertLayer::create(
                 "You Got Kicked!",
@@ -276,11 +272,7 @@ void NetworkManager::poll(){
 
             disconnect();
 
-            auto scene = CCScene::create();
-            auto menuLayer = MenuLayer::create();
-            scene->addChild(menuLayer);
-
-            CCDirector::sharedDirector()->replaceScene(CCTransitionFade::create(0.5f,scene));
+            CCDirector::sharedDirector()->replaceScene(CCTransitionFade::create(0.5f, MenuLayer::scene(false)));
 
             FLAlertLayer::create(
                 "Disconnected",
