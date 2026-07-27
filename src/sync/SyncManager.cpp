@@ -491,8 +491,6 @@ void SyncManager::handlePacket(const uint8_t* data, size_t size) {
         }
         case PacketType::FULL_SYNC_END: {
             m_localObjects.clear();
-            m_syncedObjects.clear();
-            m_objectToUID.clear();
             trackExistingObjects();
             auto editor = getEditorLayer();
             if (editor && editor->m_editorUI) {
