@@ -22,6 +22,7 @@ extern SyncManager* g_sync;
 extern NetworkManager* g_network;
 extern bool g_isInSession;
 extern bool g_isHost;
+extern bool g_isPlaytesting;
 
 void settingsUpdate(){
     if (g_isInSession && g_sync && g_isHost && !g_sync->isApplyingRemoteChanges()) {
@@ -128,6 +129,7 @@ class $modify(MyLevelEditorLayer, LevelEditorLayer){
     void onPlaytest() {
         log::info("start playtest");
         m_fields->m_playtesting = true;
+        g_isPlaytesting = true;
         if (g_sync) {
             g_sync->cleanUpPlayers();
         }
@@ -139,6 +141,7 @@ class $modify(MyLevelEditorLayer, LevelEditorLayer){
         log::info("stop playtest");
 
         m_fields->m_playtesting = false;
+        g_isPlaytesting = false;
         if (g_sync) {
             g_sync->cleanUpPlayers();
         }
@@ -175,7 +178,7 @@ class $modify(MyGJBaseGameLayer, GJBaseGameLayer) {
     void addToSection(GameObject* obj) {
         GJBaseGameLayer::addToSection(obj);
 
-        if (!obj || !g_isInSession || !g_sync || g_sync->isApplyingRemoteChanges()) return;
+        if (!obj || !g_isInSession || !g_sync || g_isPlaytesting || g_sync->isApplyingRemoteChanges()) return;
 
         auto editor = LevelEditorLayer::get();
         if (!editor || static_cast<GJBaseGameLayer*>(editor) != this) return;
@@ -213,7 +216,7 @@ class $modify(MyEditorUI, EditorUI) {
     }
 
     void syncTick(float dt) {
-        if (!g_isInSession || !g_sync || g_sync->isApplyingRemoteChanges()) return;
+        if (!g_isInSession || !g_sync || g_isPlaytesting || g_sync->isApplyingRemoteChanges()) return;
 
         auto editor = LevelEditorLayer::get();
         if (!editor || !editor->m_objects) return;

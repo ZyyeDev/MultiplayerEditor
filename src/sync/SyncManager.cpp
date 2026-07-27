@@ -353,17 +353,19 @@ void SyncManager::handlePacket(const uint8_t* data, size_t size) {
         case PacketType::HANDSHAKE: {
             if (size < sizeof(HandshakePacket)) break;
             const HandshakePacket* packet = reinterpret_cast<const HandshakePacket*>(data);
+            std::string theirVersion = safeStr(packet->version);
+            std::string theirUsername = safeStr(packet->username);
             // i think we want to do this in another way but it works for now
             std::string myVersion = Mod::get()->getVersion().toNonVString();
-            log::info("got handshake from {}, their version '{}' my version '{}'", packet->header.senderID, packet->version, myVersion);
+            log::info("got handshake from {}, their version '{}' my version '{}'", packet->header.senderID, theirVersion, myVersion);
             
-            log::info("registering peer {} as '{}'", packet->header.senderID, packet->username);
-            g_network->addPeer(packet->header.senderID, packet->username);
+            log::info("registering peer {} as '{}'", packet->header.senderID, theirUsername);
+            g_network->addPeer(packet->header.senderID, theirUsername);
             if (g_isHost){
-                g_network->broadcastPeerJoined(packet->header.senderID, packet->username);
+                g_network->broadcastPeerJoined(packet->header.senderID, theirUsername);
 
                 // we MUST do this in another way
-                if (!g_network->checkPassword(packet->password)){
+                if (!g_network->checkPassword(safeStr(packet->password))){
                     log::info("user connecting password is incorrect");
                     
                     KickPacket _kickPacket;
@@ -381,7 +383,7 @@ void SyncManager::handlePacket(const uint8_t* data, size_t size) {
                     break;
                 }
 
-                if (myVersion != packet->version){
+                if (myVersion != theirVersion){
                     log::warn("version mismatch, kicking {}", packet->header.senderID);
                     if (g_isHost){
                         KickPacket _kickPacket;
@@ -408,7 +410,7 @@ void SyncManager::handlePacket(const uint8_t* data, size_t size) {
             if (size < sizeof(KickPacket)) break;
             const KickPacket* packet = reinterpret_cast<const KickPacket*>(data);
             if (!g_isHost && packet->userToKick == g_network->getPeerID()){
-                g_network->gotKicked(packet->kickReason);
+                g_network->gotKicked(safeStr(packet->kickReason));
                 break;
             }
             g_network->removePeer(packet->userToKick);
@@ -431,8 +433,9 @@ void SyncManager::handlePacket(const uint8_t* data, size_t size) {
         case PacketType::PEER_JOINED: {
             if (size < sizeof(PeerJoinedPacket)) break;
             const PeerJoinedPacket* packet = reinterpret_cast<const PeerJoinedPacket*>(data);
-            g_network->addPeer(packet->peerID, packet->username);
-            log::info("peer joined {} ({})", packet->peerID, packet->username);
+            std::string theirUsername = safeStr(packet->username);
+            g_network->addPeer(packet->peerID, theirUsername);
+            log::info("peer joined {} ({})", packet->peerID, theirUsername);
             break;
         }
         case PacketType::PEER_LEFT: {
@@ -491,7 +494,7 @@ void SyncManager::handlePacket(const uint8_t* data, size_t size) {
             if (size < offsetof(ObjectStringPacket, objectString)) break;
             const ObjectStringPacket* packet = reinterpret_cast<const ObjectStringPacket*>(data);
             if (size < offsetof(ObjectStringPacket, objectString) + packet->chunkLength) break;
-            std::string uid(packet->uid);
+            std::string uid = safeStr(packet->uid);
 
             if (packet->chunkIndex == 0) m_incomingChunks[uid] = ChunkBuffer{};
             m_incomingChunks[uid].data.append(packet->objectString, packet->chunkLength);
@@ -514,7 +517,7 @@ void SyncManager::handlePacket(const uint8_t* data, size_t size) {
             if (size < offsetof(ObjectStringPacket, objectString)) break;
             const ObjectStringPacket* packet = reinterpret_cast<const ObjectStringPacket*>(data);
             if (size < offsetof(ObjectStringPacket, objectString) + packet->chunkLength) break;
-            std::string uid(packet->uid);
+            std::string uid = safeStr(packet->uid);
 
             if (packet->chunkIndex == 0) m_incomingChunks[uid] = ChunkBuffer{};
             m_incomingChunks[uid].data.append(packet->objectString, packet->chunkLength);
@@ -558,7 +561,7 @@ void SyncManager::handlePacket(const uint8_t* data, size_t size) {
             }
             
             for (uint32_t i = 0; i < packet->countInChunk && i < 50; i++) {
-                std::string uid(packet->uids[i]);
+                std::string uid = safeStr(packet->uids[i]);
                 m_remoteSelections[packet->header.senderID][uid] = 3.0f;
             }
             

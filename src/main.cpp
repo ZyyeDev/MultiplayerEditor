@@ -17,6 +17,7 @@ SyncManager* g_sync = nullptr;
 // session states
 bool g_isHost = false;
 bool g_isInSession = false;
+bool g_isPlaytesting = false;
 
 bool wasPlaytesting = false;
 

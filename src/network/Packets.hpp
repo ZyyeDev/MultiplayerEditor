@@ -170,6 +170,11 @@ struct LobbySyncPacket{
 
 #pragma pack(pop)
 
+template<size_t N>
+inline std::string safeStr(const char (&buf)[N]) {
+    return std::string(buf, strnlen(buf, N));
+}
+
 inline uint32_t getCurrentTimestamp() {
     return static_cast<uint32_t>(std::time(nullptr));
 }
