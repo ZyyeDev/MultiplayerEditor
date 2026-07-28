@@ -913,7 +913,7 @@ void SyncManager::applyLevelSettings(const LevelSettingsPacket& settings) {
             }
 
             auto* engine = FMODAudioEngine::sharedEngine();
-            engine->stopAllMusic();
+            engine->stopAllMusic(false);
         }
     }
 

@@ -3,6 +3,8 @@
 #include <Geode/Geode.hpp>
 #include <Geode/binding/GJAccountManager.hpp>
 
+#include "../sync/SyncManager.hpp"
+
 #ifdef _WIN32
 #include <winsock2.h>
 #include <ws2tcpip.h>
