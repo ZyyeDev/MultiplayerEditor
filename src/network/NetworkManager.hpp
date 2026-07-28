@@ -60,6 +60,9 @@ class NetworkManager{
         std::string getPassword() { return m_password; }
 
         bool requestFullSync = false;
+
+        // increase enet timeouts so connection survives window minimize
+        void setPeerTimeouts();
     private:
         ENetHost* m_host;
         ENetPeer* m_peer;

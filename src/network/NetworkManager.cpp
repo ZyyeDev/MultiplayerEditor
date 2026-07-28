@@ -75,6 +75,9 @@ bool NetworkManager::host(uint16_t port, const std::string& password){
 
     setPassword(password);
 
+    // set timeouts on all connected peers
+    setPeerTimeouts();
+
     log::info("Hosting on port {}", port);
     return true;
 }
@@ -119,6 +122,8 @@ bool NetworkManager::connect(const std::string& ip, uint16_t port, const std::st
         m_peer = event.peer;
 
         m_pendingHandshake = true;
+
+        setPeerTimeouts();
         
         return true;
     } else {
@@ -291,6 +296,7 @@ void NetworkManager::poll(){
 
                 if (m_isHost) {
                     m_connectedPeers[event.peer->connectID] = event.peer;
+                    enet_peer_timeout(event.peer, 64, 5000, 120000);
                 } else {
                     m_peer = event.peer;
                 }
@@ -408,4 +414,18 @@ void NetworkManager::sendLobbyState(uint32_t targetPeerID) {
 void NetworkManager::gotKicked(std::string reason){
     m_pendingKick = true;
     m_pendingKickReason = reason;
+}
+
+void NetworkManager::setPeerTimeouts() {
+    // Increase enet timeouts so the connection survives window minimize
+    // Default timeout is 5s, increasing to 60s
+    if (m_isHost) {
+        for (auto& [id, peer] : m_connectedPeers) {
+            if (peer) {
+                enet_peer_timeout(peer, 64, 5000, 120000);
+            }
+        }
+    } else if (m_peer) {
+        enet_peer_timeout(m_peer, 64, 5000, 120000);
+    }
 }
