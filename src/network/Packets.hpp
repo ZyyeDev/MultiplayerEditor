@@ -82,7 +82,7 @@ struct MousePacket{
 struct ColorChannelsPacket{
     PacketHeader header;
     uint32_t count;
-    SavedColorData colorDat[200];
+    SavedColorData colorDat[1000];
 };
 
 struct LevelSettingsPacket {

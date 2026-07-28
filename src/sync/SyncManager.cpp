@@ -317,6 +317,7 @@ void SyncManager::sendFullState(uint32_t targetPeerID) {
 
     }
 
+    sendAllColors(targetPeerID);
     onLocalLevelSettingsChanged();
 
     FullSyncEndPacket endPkt;
@@ -540,7 +541,7 @@ void SyncManager::handlePacket(const uint8_t* data, size_t size) {
         case PacketType::COLOR_SYNC: {
             if (size < offsetof(ColorChannelsPacket, colorDat)) break;
             const ColorChannelsPacket* packet = reinterpret_cast<const ColorChannelsPacket*>(data);
-            if (packet->count > 200) break;
+            if (packet->count > 1000) break;
             size_t expectedSize = offsetof(ColorChannelsPacket, colorDat) + packet->count * sizeof(SavedColorData);
             if (size < expectedSize) break;
             std::vector<SavedColorData> colors(packet->colorDat, packet->colorDat + packet->count);
@@ -1305,4 +1306,38 @@ void SyncManager::syncColorAction(ColorAction* action){
     
     size_t sendSize = offsetof(ColorChannelsPacket, colorDat) + packet.count * sizeof(SavedColorData);
     g_network->sendPacket(&packet, sendSize);
+}
+
+void SyncManager::sendAllColors(uint32_t targetPeerID) {
+    auto mgr = getActiveEffectManager();
+    if (!mgr) return;
+    auto actions = mgr->getAllColorActions();
+    if (!actions || actions->count() == 0) return;
+
+    ColorChannelsPacket packet{};
+    packet.header.type = PacketType::COLOR_SYNC;
+    packet.header.timestamp = getCurrentTimestamp();
+    packet.header.senderID = g_network->getPeerID();
+
+    size_t count = 0;
+    for (auto action : CCArrayExt<ColorAction*>(actions)) {
+        if (count >= 1000 || !action) break;
+        packet.colorDat[count].colorID = action->m_colorID;
+        packet.colorDat[count].r = action->m_fromColor.r;
+        packet.colorDat[count].g = action->m_fromColor.g;
+        packet.colorDat[count].b = action->m_fromColor.b;
+        packet.colorDat[count].blending = action->m_blending ? 1 : 0;
+        packet.colorDat[count].opacity = action->m_currentOpacity;
+        packet.colorDat[count].copyID = action->m_copyID;
+        count++;
+    }
+    packet.count = count;
+
+    size_t sendSize = offsetof(ColorChannelsPacket, colorDat) + packet.count * sizeof(SavedColorData);
+
+    if (targetPeerID != 0) {
+        g_network->sendPacketToPeer(targetPeerID, &packet, sendSize);
+    } else {
+        g_network->sendPacket(&packet, sendSize);
+    }
 }

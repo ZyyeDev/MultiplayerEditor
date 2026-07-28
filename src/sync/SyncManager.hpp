@@ -146,4 +146,5 @@ class SyncManager{
         void restoreColor(SavedColorData ColorData);
         std::unordered_map<int, ccColor3B> getAllChannelColors();
         void syncColorAction(ColorAction* action);
+        void sendAllColors(uint32_t targetPeerID = 0);
 };
