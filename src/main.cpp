@@ -4,6 +4,8 @@
 #include <Geode/modify/MenuLayer.hpp>
 #include <Geode/modify/CCScheduler.hpp>
 
+#include <chrono>
+
 #include "network/NetworkManager.hpp"
 #include "sync/SyncManager.hpp"
 #include "utils/MouseTooltip.hpp"
@@ -59,6 +61,16 @@ $on_mod(Loaded){
 class $modify(CCScheduler) {
     void update(float dt) {
         CCScheduler::update(dt);
+
+        // detect window restore after minimize
+        static auto lastFrame = std::chrono::steady_clock::now();
+        auto now = std::chrono::steady_clock::now();
+        auto elapsedMs = std::chrono::duration_cast<std::chrono::milliseconds>(now - lastFrame).count();
+        lastFrame = now;
+        if (elapsedMs > 3000 && g_isInSession && !g_isHost && g_network && g_network->isConnected()) {
+            g_network->requestFullSync = true;
+        }
+
         MouseTooltip::get()->update();
         
         if (g_isInSession && g_network) {
