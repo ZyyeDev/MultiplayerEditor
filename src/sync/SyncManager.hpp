@@ -136,6 +136,7 @@ class SyncManager{
 
         void cleanUpPlayers();
         void clearAllRemoteState();
+        void clearPeerState(uint32_t peerID);
 
         void processPendingLevelSettings();
 

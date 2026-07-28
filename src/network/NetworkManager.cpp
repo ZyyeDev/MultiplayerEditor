@@ -317,6 +317,11 @@ void NetworkManager::poll(){
                     removePeer(disconnectedPeerID);
                     m_connectedPeers.erase(disconnectedPeerID);
                     broadcastPeerLeft(disconnectedPeerID);
+                    // Clean up sync state on host (PEER_LEFT broadcast doesnt reach host)
+                    extern SyncManager* g_sync;
+                    if (g_sync) {
+                        g_sync->clearPeerState(disconnectedPeerID);
+                    }
                     if (m_onDisconnect) m_onDisconnect();
                 } else {
                     m_peer = nullptr;

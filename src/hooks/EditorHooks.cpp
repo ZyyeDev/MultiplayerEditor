@@ -82,7 +82,15 @@ class $modify(MyLevelEditorLayer, LevelEditorLayer){
     void levelSettingsUpdated() {
         LevelEditorLayer::levelSettingsUpdated();
 
-        if (g_isInSession && g_isHost && g_network) {
+        if (g_isInSession && g_isHost && g_network && !g_sync->isApplyingRemoteChanges()) {
+            // Dont send if any popup is still open (issue #7)
+            auto scene = CCDirector::sharedDirector()->getRunningScene();
+            if (scene) {
+                for (auto child : CCArrayExt<CCNode*>(scene->getChildren())) {
+                    if (typeinfo_cast<FLAlertLayer*>(child) || typeinfo_cast<GJDropDownLayer*>(child)) return;
+                }
+            }
+
             LevelSettingsPacket settings;
             settings.header.type = PacketType::LEVEL_SETTINGS;
             settings.header.timestamp = getCurrentTimestamp();

@@ -846,6 +846,7 @@ bool SyncManager::isPopupBlockingLevelSettings() {
 
     for (auto child : CCArrayExt<CCNode*>(scene->getChildren())) {
         if (typeinfo_cast<FLAlertLayer*>(child)) return true;
+        if (typeinfo_cast<GJDropDownLayer*>(child)) return true;
     }
 
     return false;
@@ -910,6 +911,9 @@ void SyncManager::applyLevelSettings(const LevelSettingsPacket& settings) {
                     MusicDownloadManager::sharedState()->downloadCustomSong(settings.songID);
                 }
             }
+
+            auto* engine = FMODAudioEngine::sharedEngine();
+            engine->stopAllMusic();
         }
     }
 
@@ -1248,6 +1252,44 @@ void SyncManager::clearAllRemoteState(){
     m_pendingObjectUpdates.clear();
 
     MouseTooltip::get()->clear();
+}
+
+void SyncManager::clearPeerState(uint32_t peerID) {
+    // remove cursor
+    auto cursorIt = m_remoteCursors.find(peerID);
+    if (cursorIt != m_remoteCursors.end()) {
+        if (cursorIt->second && cursorIt->second->getParent()) {
+            cursorIt->second->removeFromParent();
+        }
+        m_remoteCursors.erase(cursorIt);
+    }
+
+    // remove selection highlights
+    auto highlightsIt = m_remoteSelectionHighlights.find(peerID);
+    if (highlightsIt != m_remoteSelectionHighlights.end()) {
+        for (auto sprite : highlightsIt->second) {
+            if (sprite) {
+                MouseTooltip::get()->unregisterRegion(sprite->getParent());
+                sprite->removeFromParent();
+            }
+        }
+        m_remoteSelectionHighlights.erase(highlightsIt);
+    }
+
+    // remove selection data
+    m_remoteSelections.erase(peerID);
+
+    // remove remote player
+    auto playerIt = m_remotePlayers.find(peerID);
+    if (playerIt != m_remotePlayers.end()) {
+        if (playerIt->second.player) {
+            if (playerIt->second.player->getParent()) {
+                playerIt->second.player->removeFromParent();
+            }
+            playerIt->second.player->destroyObject();
+        }
+        m_remotePlayers.erase(playerIt);
+    }
 }
 
 GJEffectManager* SyncManager::getActiveEffectManager(){
