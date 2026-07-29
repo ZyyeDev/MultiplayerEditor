@@ -973,24 +973,16 @@ void SyncManager::pruneStaleTrackedObjects() {
         editorObjects.insert(static_cast<GameObject*>(editor->m_objects->objectAtIndex(i)));
     }
 
-    std::vector<std::string> removed;
+    std::vector<std::string> stale;
     for (auto& [uid, obj] : m_syncedObjects) {
         if (!editorObjects.count(obj)) {
-            removed.push_back(uid);
+            stale.push_back(uid);
         }
     }
 
-    if (removed.empty()) return;
+    if (stale.empty()) return;
 
-    for (auto& uid : removed) {
-        ObjectDeletePacket pkt;
-        pkt.header.type = PacketType::OBJECT_DELETE;
-        pkt.header.timestamp = getCurrentTimestamp();
-        pkt.header.senderID = g_network->getPeerID();
-        strncpy(pkt.uid, uid.c_str(), 31);
-        pkt.uid[31] = '\0';
-        g_network->sendPacket(&pkt, sizeof(pkt));
-
+    for (auto& uid : stale) {
         m_localObjects.erase(m_syncedObjects[uid]);
         untrackObject(uid);
 

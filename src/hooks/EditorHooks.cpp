@@ -180,6 +180,16 @@ class $modify(MyLevelEditorLayer, LevelEditorLayer){
 
         return obj;
     }
+    
+    void removeObject(GameObject* object, bool noUndo) {
+        if (object && g_isInSession && g_sync && !g_sync->isApplyingRemoteChanges()) {
+            if (g_sync->isTrackedObject(object)) {
+                g_sync->onLocalObjectDestroyed(object);
+            }
+        }
+
+        LevelEditorLayer::removeObject(object, noUndo);
+    }
 };
 
 class $modify(MyGJBaseGameLayer, GJBaseGameLayer) {
