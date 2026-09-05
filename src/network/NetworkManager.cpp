@@ -312,7 +312,13 @@ void NetworkManager::poll(){
                 enet_packet_destroy(event.packet);
                 break;
             case ENET_EVENT_TYPE_DISCONNECT: {
-                uint32_t disconnectedPeerID = event.peer->connectID;
+                uint32_t disconnectedPeerID = 0;
+                for (auto& [id, peer] : m_connectedPeers) {
+                    if (peer == event.peer) {
+                        disconnectedPeerID = id;
+                        break;
+                    }
+                }
                 log::info("peer {} disconnected", disconnectedPeerID);
 
                 if (m_isHost){
