@@ -15,6 +15,8 @@ struct PendingAction;
 struct RemotePlayer {
     PlayerObject* player;
     std::string userId;
+    uint8_t appliedGameMode = 255;
+    int appliedIconFrame = -1;
 };
 
 class SyncManager{

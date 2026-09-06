@@ -10,6 +10,80 @@
 extern NetworkManager* g_network;
 extern bool g_isHost;
 
+static PlayerGameMode getLocalPlayerGameMode(PlayerObject* plr) {
+    if (plr->m_isShip) return PlayerGameMode::Ship;
+    if (plr->m_isBall) return PlayerGameMode::Ball;
+    if (plr->m_isBird) return PlayerGameMode::Ufo;
+    if (plr->m_isDart) return PlayerGameMode::Wave;
+    if (plr->m_isRobot) return PlayerGameMode::Robot;
+    if (plr->m_isSpider) return PlayerGameMode::Spider;
+    if (plr->m_isSwing) return PlayerGameMode::Swing;
+    return PlayerGameMode::Cube;
+}
+
+static int iconFrameForMode(PlayerGameMode mode, const PlayerIconData& iconData) {
+    switch (mode) {
+        case PlayerGameMode::Ship: return iconData.shipID;
+        case PlayerGameMode::Ball: return iconData.ballID;
+        case PlayerGameMode::Ufo: return iconData.ufoID;
+        case PlayerGameMode::Wave: return iconData.waveID;
+        case PlayerGameMode::Robot: return iconData.robotID;
+        case PlayerGameMode::Spider: return iconData.spiderID;
+        case PlayerGameMode::Swing: return iconData.swingID;
+        case PlayerGameMode::Jetpack: return iconData.jetpackID;
+        default: return iconData.iconID;
+    }
+}
+
+static void applyRemotePlayerMode(PlayerObject* player, PlayerGameMode mode, const PlayerIconData& iconData) {
+    player->m_isShip = false;
+    player->m_isBall = false;
+    player->m_isBird = false;
+    player->m_isDart = false;
+    player->m_isRobot = false;
+    player->m_isSpider = false;
+    player->m_isSwing = false;
+
+    int frame = iconFrameForMode(mode, iconData);
+
+    switch (mode) {
+        case PlayerGameMode::Ship:
+            player->m_isShip = true;
+            player->updatePlayerShipFrame(frame);
+            break;
+        case PlayerGameMode::Ball:
+            player->m_isBall = true;
+            player->updatePlayerRollFrame(frame);
+            break;
+        case PlayerGameMode::Ufo:
+            player->m_isBird = true;
+            player->updatePlayerBirdFrame(frame);
+            break;
+        case PlayerGameMode::Wave:
+            player->m_isDart = true;
+            player->updatePlayerDartFrame(frame);
+            break;
+        case PlayerGameMode::Robot:
+            player->m_isRobot = true;
+            player->updatePlayerRobotFrame(frame);
+            break;
+        case PlayerGameMode::Spider:
+            player->m_isSpider = true;
+            player->updatePlayerSpiderFrame(frame);
+            break;
+        case PlayerGameMode::Swing:
+            player->m_isSwing = true;
+            player->updatePlayerSwingFrame(frame);
+            break;
+        case PlayerGameMode::Jetpack:
+            player->updatePlayerJetpackFrame(frame);
+            break;
+        default:
+            player->updatePlayerFrame(frame);
+            break;
+    }
+}
+
 SyncManager::SyncManager() : m_objectCounter(0), m_lastUpdateTimestamp(0) {
     m_userID = g_network->getPeerID();
 
@@ -1100,6 +1174,7 @@ void SyncManager::sendPlayerPosition(LevelEditorLayer* editorLayer, bool stopPla
     packet.isUpsideDown = plr->m_isUpsideDown;
     packet.isDead = plr->m_isDead;
     packet.stopPlaytest = stopPlaytest;
+    packet.gameMode = static_cast<uint8_t>(getLocalPlayerGameMode(plr));
 
     packet.iconData.iconID = gameManager->getPlayerFrame();
     packet.iconData.shipID = gameManager->getPlayerShip();
@@ -1171,11 +1246,16 @@ void SyncManager::onRemotePlayerPosition(const PlayerPositionPacket& packet, Lev
             remotePlayer->disableCustomGlowColor();
         }
         
+        auto gameMode = static_cast<PlayerGameMode>(packet.gameMode);
+        applyRemotePlayerMode(remotePlayer, gameMode, packet.iconData);
+        
         editorLayer->m_objectLayer->addChild(remotePlayer);
         
         RemotePlayer rp;
         rp.player = remotePlayer;
         rp.userId = userId;
+        rp.appliedGameMode = static_cast<uint8_t>(gameMode);
+        rp.appliedIconFrame = iconFrameForMode(gameMode, packet.iconData);
         m_remotePlayers[userId] = rp;
         
         log::info("Created remote player for user: {}", userId);
@@ -1189,6 +1269,15 @@ void SyncManager::onRemotePlayerPosition(const PlayerPositionPacket& packet, Lev
         remotePlayer->setPosition(ccp(packet.x, packet.y));
         remotePlayer->setRotation(packet.rotation);
         remotePlayer->m_isUpsideDown = packet.isUpsideDown;
+
+        auto gameMode = static_cast<PlayerGameMode>(packet.gameMode);
+        int iconFrame = iconFrameForMode(gameMode, packet.iconData);
+        if (it->second.appliedGameMode != static_cast<uint8_t>(gameMode) ||
+            it->second.appliedIconFrame != iconFrame) {
+            applyRemotePlayerMode(remotePlayer, gameMode, packet.iconData);
+            it->second.appliedGameMode = static_cast<uint8_t>(gameMode);
+            it->second.appliedIconFrame = iconFrame;
+        }
 
         if (packet.isDead) {
             remotePlayer->m_isDead = true;
