@@ -2,6 +2,7 @@
 #include <sstream>
 #include <cstring>
 #include <cstddef>
+#include <cmath>
 #include "SyncManager.hpp"
 #include "../network/NetworkManager.hpp"
 #include "../network/Packets.hpp"
@@ -117,6 +118,7 @@ static void updateRemotePlayerVisual(
     float y,
     float rotation,
     bool upsideDown,
+    bool goingLeft,
     bool dead
 ) {
     if (!player) return;
@@ -124,12 +126,20 @@ static void updateRemotePlayerVisual(
     player->setPosition(ccp(x, y));
     player->setRotation(rotation);
     player->m_isUpsideDown = upsideDown;
+    player->m_isGoingLeft = goingLeft;
 
     int iconFrame = iconFrameForMode(gameMode, iconData);
     if (appliedMode != static_cast<uint8_t>(gameMode) || appliedFrame != iconFrame) {
         applyRemotePlayerMode(player, gameMode, iconData, static_cast<PlayerGameMode>(appliedMode));
         appliedMode = static_cast<uint8_t>(gameMode);
         appliedFrame = iconFrame;
+    }
+
+    if (player->m_mainLayer) {
+        float sx = std::abs(player->m_mainLayer->getScaleX());
+        float sy = std::abs(player->m_mainLayer->getScaleY());
+        player->m_mainLayer->setScaleX(sx * (goingLeft ? -1.0f : 1.0f));
+        player->m_mainLayer->setScaleY(sy * (upsideDown ? -1.0f : 1.0f));
     }
 
     if (dead) {
@@ -1232,6 +1242,7 @@ void SyncManager::sendPlayerPosition(LevelEditorLayer* editorLayer, bool stopPla
     packet.y = plr->getPositionY();
     packet.rotation = plr->getRotation();
     packet.isUpsideDown = plr->m_isUpsideDown;
+    packet.isGoingLeft = plr->m_isGoingLeft;
     packet.isDead = plr->m_isDead;
     packet.stopPlaytest = stopPlaytest;
     packet.gameMode = static_cast<uint8_t>(getLocalPlayerGameMode(plr));
@@ -1243,6 +1254,7 @@ void SyncManager::sendPlayerPosition(LevelEditorLayer* editorLayer, bool stopPla
         packet.y2 = plr2->getPositionY();
         packet.rotation2 = plr2->getRotation();
         packet.isUpsideDown2 = plr2->m_isUpsideDown;
+        packet.isGoingLeft2 = plr2->m_isGoingLeft;
         packet.isDead2 = plr2->m_isDead;
         packet.gameMode2 = static_cast<uint8_t>(getLocalPlayerGameMode(plr2));
     }
@@ -1317,6 +1329,7 @@ void SyncManager::onRemotePlayerPosition(const PlayerPositionPacket& packet, Lev
         packet.y,
         packet.rotation,
         packet.isUpsideDown,
+        packet.isGoingLeft,
         packet.isDead
     );
 
@@ -1339,6 +1352,7 @@ void SyncManager::onRemotePlayerPosition(const PlayerPositionPacket& packet, Lev
                 packet.y2,
                 packet.rotation2,
                 packet.isUpsideDown2,
+                packet.isGoingLeft2,
                 packet.isDead2
             );
         }
