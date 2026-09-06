@@ -19,6 +19,8 @@ struct RemotePlayer {
     int appliedIconFrame = -1;
     uint8_t appliedGameMode2 = 255;
     int appliedIconFrame2 = -1;
+    std::string appliedRobotAnim;
+    std::string appliedRobotAnim2;
 };
 
 class SyncManager{

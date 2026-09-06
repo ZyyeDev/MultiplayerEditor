@@ -145,6 +145,7 @@ struct PlayerPositionPacket{
     bool isDead;
     bool stopPlaytest;
     uint8_t gameMode;
+    char robotAnim[32];
     bool hasSecond;
     float x2;
     float y2;
@@ -154,6 +155,7 @@ struct PlayerPositionPacket{
     bool isGoingLeft2;
     bool isDead2;
     uint8_t gameMode2;
+    char robotAnim2[32];
     PlayerIconData iconData;
 };
 

@@ -120,7 +120,9 @@ static void updateRemotePlayerVisual(
     float playerScale,
     bool upsideDown,
     bool goingLeft,
-    bool dead
+    bool dead,
+    const std::string& robotAnim,
+    std::string& appliedRobotAnim
 ) {
     if (!player) return;
 
@@ -134,6 +136,7 @@ static void updateRemotePlayerVisual(
         applyRemotePlayerMode(player, gameMode, iconData, static_cast<PlayerGameMode>(appliedMode));
         appliedMode = static_cast<uint8_t>(gameMode);
         appliedFrame = iconFrame;
+        appliedRobotAnim.clear();
     }
 
     float scale = (playerScale > 0.01f) ? playerScale : 1.0f;
@@ -141,6 +144,11 @@ static void updateRemotePlayerVisual(
     if (player->m_mainLayer) {
         player->m_mainLayer->setScaleX(scale * (goingLeft ? -1.0f : 1.0f));
         player->m_mainLayer->setScaleY(scale * (upsideDown ? -1.0f : 1.0f));
+    }
+
+    if (gameMode == PlayerGameMode::Robot && player->m_robotSprite && !robotAnim.empty() && robotAnim != appliedRobotAnim) {
+        player->m_robotSprite->runAnimation(robotAnim);
+        appliedRobotAnim = robotAnim;
     }
 
     if (dead) {
@@ -1249,6 +1257,12 @@ void SyncManager::sendPlayerPosition(LevelEditorLayer* editorLayer, bool stopPla
     packet.stopPlaytest = stopPlaytest;
     packet.gameMode = static_cast<uint8_t>(getLocalPlayerGameMode(plr));
 
+    packet.robotAnim[0] = '\0';
+    if (plr->m_isRobot && !plr->m_currentRobotAnimation.empty()) {
+        strncpy(packet.robotAnim, plr->m_currentRobotAnimation.c_str(), sizeof(packet.robotAnim) - 1);
+        packet.robotAnim[sizeof(packet.robotAnim) - 1] = '\0';
+    }
+
     auto plr2 = editorLayer->m_player2;
     packet.hasSecond = plr2 && plr2->getParent() != nullptr;
     if (packet.hasSecond) {
@@ -1260,6 +1274,11 @@ void SyncManager::sendPlayerPosition(LevelEditorLayer* editorLayer, bool stopPla
         packet.isGoingLeft2 = plr2->m_isGoingLeft;
         packet.isDead2 = plr2->m_isDead;
         packet.gameMode2 = static_cast<uint8_t>(getLocalPlayerGameMode(plr2));
+        packet.robotAnim2[0] = '\0';
+        if (plr2->m_isRobot && !plr2->m_currentRobotAnimation.empty()) {
+            strncpy(packet.robotAnim2, plr2->m_currentRobotAnimation.c_str(), sizeof(packet.robotAnim2) - 1);
+            packet.robotAnim2[sizeof(packet.robotAnim2) - 1] = '\0';
+        }
     }
 
     packet.iconData.iconID = gameManager->getPlayerFrame();
@@ -1334,7 +1353,9 @@ void SyncManager::onRemotePlayerPosition(const PlayerPositionPacket& packet, Lev
         packet.playerScale,
         packet.isUpsideDown,
         packet.isGoingLeft,
-        packet.isDead
+        packet.isDead,
+        safeStr(packet.robotAnim),
+        rp.appliedRobotAnim
     );
 
     if (packet.hasSecond) {
@@ -1358,7 +1379,9 @@ void SyncManager::onRemotePlayerPosition(const PlayerPositionPacket& packet, Lev
                 packet.playerScale2,
                 packet.isUpsideDown2,
                 packet.isGoingLeft2,
-                packet.isDead2
+                packet.isDead2,
+                safeStr(packet.robotAnim2),
+                rp.appliedRobotAnim2
             );
         }
     } else if (rp.player2) {
@@ -1367,6 +1390,7 @@ void SyncManager::onRemotePlayerPosition(const PlayerPositionPacket& packet, Lev
         rp.player2 = nullptr;
         rp.appliedGameMode2 = 255;
         rp.appliedIconFrame2 = -1;
+        rp.appliedRobotAnim2.clear();
     }
 }
 
