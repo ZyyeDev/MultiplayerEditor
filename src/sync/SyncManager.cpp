@@ -35,52 +35,109 @@ static int iconFrameForMode(PlayerGameMode mode, const PlayerIconData& iconData)
     }
 }
 
-static void applyRemotePlayerMode(PlayerObject* player, PlayerGameMode mode, const PlayerIconData& iconData) {
-    player->m_isShip = false;
-    player->m_isBall = false;
-    player->m_isBird = false;
-    player->m_isDart = false;
-    player->m_isRobot = false;
-    player->m_isSpider = false;
-    player->m_isSwing = false;
-
+static void setIconForMode(PlayerObject* player, PlayerGameMode mode, const PlayerIconData& iconData) {
     int frame = iconFrameForMode(mode, iconData);
+    switch (mode) {
+        case PlayerGameMode::Ship: player->updatePlayerShipFrame(frame); break;
+        case PlayerGameMode::Ball: player->updatePlayerRollFrame(frame); break;
+        case PlayerGameMode::Ufo: player->updatePlayerBirdFrame(frame); break;
+        case PlayerGameMode::Wave: player->updatePlayerDartFrame(frame); break;
+        case PlayerGameMode::Robot: player->updatePlayerRobotFrame(frame); break;
+        case PlayerGameMode::Spider: player->updatePlayerSpiderFrame(frame); break;
+        case PlayerGameMode::Swing: player->updatePlayerSwingFrame(frame); break;
+        case PlayerGameMode::Jetpack: player->updatePlayerJetpackFrame(frame); break;
+        default: player->updatePlayerFrame(frame); break;
+    }
+}
+
+static void applyRemotePlayerMode(PlayerObject* player, PlayerGameMode mode, const PlayerIconData& iconData, PlayerGameMode prevMode) {
+    if (mode == prevMode) {
+        setIconForMode(player, mode, iconData);
+        return;
+    }
+
+    player->toggleFlyMode(false, true);
+    player->toggleRollMode(false, true);
+    player->toggleBirdMode(false, true);
+    player->toggleDartMode(false, true);
+    player->toggleRobotMode(false, true);
+    player->toggleSpiderMode(false, true);
+    player->toggleSwingMode(false, true);
 
     switch (mode) {
-        case PlayerGameMode::Ship:
-            player->m_isShip = true;
-            player->updatePlayerShipFrame(frame);
-            break;
-        case PlayerGameMode::Ball:
-            player->m_isBall = true;
-            player->updatePlayerRollFrame(frame);
-            break;
-        case PlayerGameMode::Ufo:
-            player->m_isBird = true;
-            player->updatePlayerBirdFrame(frame);
-            break;
-        case PlayerGameMode::Wave:
-            player->m_isDart = true;
-            player->updatePlayerDartFrame(frame);
-            break;
-        case PlayerGameMode::Robot:
-            player->m_isRobot = true;
-            player->updatePlayerRobotFrame(frame);
-            break;
-        case PlayerGameMode::Spider:
-            player->m_isSpider = true;
-            player->updatePlayerSpiderFrame(frame);
-            break;
-        case PlayerGameMode::Swing:
-            player->m_isSwing = true;
-            player->updatePlayerSwingFrame(frame);
-            break;
-        case PlayerGameMode::Jetpack:
-            player->updatePlayerJetpackFrame(frame);
-            break;
-        default:
-            player->updatePlayerFrame(frame);
-            break;
+        case PlayerGameMode::Ship: player->toggleFlyMode(true, true); break;
+        case PlayerGameMode::Ball: player->toggleRollMode(true, true); break;
+        case PlayerGameMode::Ufo: player->toggleBirdMode(true, true); break;
+        case PlayerGameMode::Wave: player->toggleDartMode(true, true); break;
+        case PlayerGameMode::Robot: player->toggleRobotMode(true, true); break;
+        case PlayerGameMode::Spider: player->toggleSpiderMode(true, true); break;
+        case PlayerGameMode::Swing: player->toggleSwingMode(true, true); break;
+        default: break;
+    }
+
+    setIconForMode(player, mode, iconData);
+}
+
+static PlayerObject* createRemotePlayerVisual(LevelEditorLayer* editorLayer, const PlayerIconData& iconData, bool isSecond) {
+    auto remotePlayer = PlayerObject::create(
+        iconData.iconID,
+        iconData.shipID,
+        editorLayer,
+        editorLayer->m_objectLayer,
+        false
+    );
+
+    if (!remotePlayer) return nullptr;
+
+    remotePlayer->setOpacity(200);
+    remotePlayer->setZOrder(1000);
+
+    auto gameManager = GameManager::sharedState();
+    remotePlayer->setColor(gameManager->colorForIdx(iconData.color1ID));
+    remotePlayer->setSecondColor(gameManager->colorForIdx(iconData.color2ID));
+
+    if (iconData.hasGlow) {
+        remotePlayer->enableCustomGlowColor(gameManager->colorForIdx(iconData.glowColor));
+    } else {
+        remotePlayer->disableCustomGlowColor();
+    }
+
+    if (isSecond) remotePlayer->m_isSecondPlayer = true;
+
+    return remotePlayer;
+}
+
+static void updateRemotePlayerVisual(
+    PlayerObject* player,
+    uint8_t& appliedMode,
+    int& appliedFrame,
+    PlayerGameMode gameMode,
+    const PlayerIconData& iconData,
+    float x,
+    float y,
+    float rotation,
+    bool upsideDown,
+    bool dead
+) {
+    if (!player) return;
+
+    player->setPosition(ccp(x, y));
+    player->setRotation(rotation);
+    player->m_isUpsideDown = upsideDown;
+
+    int iconFrame = iconFrameForMode(gameMode, iconData);
+    if (appliedMode != static_cast<uint8_t>(gameMode) || appliedFrame != iconFrame) {
+        applyRemotePlayerMode(player, gameMode, iconData, static_cast<PlayerGameMode>(appliedMode));
+        appliedMode = static_cast<uint8_t>(gameMode);
+        appliedFrame = iconFrame;
+    }
+
+    if (dead) {
+        player->m_isDead = true;
+        player->setVisible(false);
+    } else {
+        player->m_isDead = false;
+        player->setVisible(true);
     }
 }
 
@@ -1148,6 +1205,9 @@ void SyncManager::updatePlayerSync(float dt, LevelEditorLayer* editorLayer, bool
         if (remotePlr.player && !remotePlr.player->m_isDead){
             remotePlr.player->setVisible(true);
         }
+        if (remotePlr.player2 && !remotePlr.player2->m_isDead){
+            remotePlr.player2->setVisible(true);
+        }
     }
 }
 
@@ -1175,6 +1235,17 @@ void SyncManager::sendPlayerPosition(LevelEditorLayer* editorLayer, bool stopPla
     packet.isDead = plr->m_isDead;
     packet.stopPlaytest = stopPlaytest;
     packet.gameMode = static_cast<uint8_t>(getLocalPlayerGameMode(plr));
+
+    auto plr2 = editorLayer->m_player2;
+    packet.hasSecond = plr2 && plr2->getParent() != nullptr;
+    if (packet.hasSecond) {
+        packet.x2 = plr2->getPositionX();
+        packet.y2 = plr2->getPositionY();
+        packet.rotation2 = plr2->getRotation();
+        packet.isUpsideDown2 = plr2->m_isUpsideDown;
+        packet.isDead2 = plr2->m_isDead;
+        packet.gameMode2 = static_cast<uint8_t>(getLocalPlayerGameMode(plr2));
+    }
 
     packet.iconData.iconID = gameManager->getPlayerFrame();
     packet.iconData.shipID = gameManager->getPlayerShip();
@@ -1210,82 +1281,73 @@ void SyncManager::onRemotePlayerPosition(const PlayerPositionPacket& packet, Lev
                 remotePlayer->setVisible(false);
                 remotePlayer->destroyObject();
             }
+            auto remotePlayer2 = it->second.player2;
+            if (remotePlayer2){
+                remotePlayer2->setVisible(false);
+                remotePlayer2->destroyObject();
+            }
             m_remotePlayers.erase(it);
         }
         return;
     }
 
     if (it == m_remotePlayers.end()) {
-        auto remotePlayer = PlayerObject::create(
-            packet.iconData.iconID,
-            packet.iconData.shipID,
-            editorLayer,
-            editorLayer->m_objectLayer,
-            false
-        );
-
-        if (!remotePlayer) {
+        RemotePlayer rp;
+        rp.player = createRemotePlayerVisual(editorLayer, packet.iconData, false);
+        if (!rp.player) {
             log::error("Failed to create remote player!");
             return;
         }
-        
-        remotePlayer->setOpacity(200);
-        remotePlayer->setPosition(ccp(packet.x, packet.y));
-        remotePlayer->setRotation(packet.rotation);
-        remotePlayer->m_isUpsideDown = packet.isUpsideDown;
-        remotePlayer->m_isDead = packet.isDead;
-        
-        auto gameManager = GameManager::sharedState();
-        remotePlayer->setColor(gameManager->colorForIdx(packet.iconData.color1ID));
-        remotePlayer->setSecondColor(gameManager->colorForIdx(packet.iconData.color2ID));
-        remotePlayer->setZOrder(1000);
-        
-        if (packet.iconData.hasGlow) {
-            remotePlayer->enableCustomGlowColor(gameManager->colorForIdx(packet.iconData.glowColor));
-        } else {
-            remotePlayer->disableCustomGlowColor();
-        }
-        
-        auto gameMode = static_cast<PlayerGameMode>(packet.gameMode);
-        applyRemotePlayerMode(remotePlayer, gameMode, packet.iconData);
-        
-        editorLayer->m_objectLayer->addChild(remotePlayer);
-        
-        RemotePlayer rp;
-        rp.player = remotePlayer;
-        rp.userId = userId;
-        rp.appliedGameMode = static_cast<uint8_t>(gameMode);
-        rp.appliedIconFrame = iconFrameForMode(gameMode, packet.iconData);
+        rp.appliedGameMode = static_cast<uint8_t>(PlayerGameMode::Cube);
+        editorLayer->m_objectLayer->addChild(rp.player);
         m_remotePlayers[userId] = rp;
         
         log::info("Created remote player for user: {}", userId);
-    } else {
-        auto remotePlayer = it->second.player;
-        if (!remotePlayer){
-            log::error("remote player is null!");
-            return;
-        }
+    }
 
-        remotePlayer->setPosition(ccp(packet.x, packet.y));
-        remotePlayer->setRotation(packet.rotation);
-        remotePlayer->m_isUpsideDown = packet.isUpsideDown;
+    auto& rp = m_remotePlayers[userId];
 
-        auto gameMode = static_cast<PlayerGameMode>(packet.gameMode);
-        int iconFrame = iconFrameForMode(gameMode, packet.iconData);
-        if (it->second.appliedGameMode != static_cast<uint8_t>(gameMode) ||
-            it->second.appliedIconFrame != iconFrame) {
-            applyRemotePlayerMode(remotePlayer, gameMode, packet.iconData);
-            it->second.appliedGameMode = static_cast<uint8_t>(gameMode);
-            it->second.appliedIconFrame = iconFrame;
-        }
+    updateRemotePlayerVisual(
+        rp.player,
+        rp.appliedGameMode,
+        rp.appliedIconFrame,
+        static_cast<PlayerGameMode>(packet.gameMode),
+        packet.iconData,
+        packet.x,
+        packet.y,
+        packet.rotation,
+        packet.isUpsideDown,
+        packet.isDead
+    );
 
-        if (packet.isDead) {
-            remotePlayer->m_isDead = true;
-            remotePlayer->setVisible(false);
-        } else {
-            remotePlayer->m_isDead = false;
-            remotePlayer->setVisible(true);
+    if (packet.hasSecond) {
+        if (!rp.player2) {
+            rp.player2 = createRemotePlayerVisual(editorLayer, packet.iconData, true);
+            if (rp.player2) {
+                rp.appliedGameMode2 = static_cast<uint8_t>(PlayerGameMode::Cube);
+                editorLayer->m_objectLayer->addChild(rp.player2);
+            }
         }
+        if (rp.player2) {
+            updateRemotePlayerVisual(
+                rp.player2,
+                rp.appliedGameMode2,
+                rp.appliedIconFrame2,
+                static_cast<PlayerGameMode>(packet.gameMode2),
+                packet.iconData,
+                packet.x2,
+                packet.y2,
+                packet.rotation2,
+                packet.isUpsideDown2,
+                packet.isDead2
+            );
+        }
+    } else if (rp.player2) {
+        rp.player2->setVisible(false);
+        rp.player2->destroyObject();
+        rp.player2 = nullptr;
+        rp.appliedGameMode2 = 255;
+        rp.appliedIconFrame2 = -1;
     }
 }
 
@@ -1294,6 +1356,11 @@ void SyncManager::cleanUpPlayers() {
         if (remotePlayer.player) {
             if (remotePlayer.player->getParent()){
                 remotePlayer.player->removeFromParent();
+            }
+        }
+        if (remotePlayer.player2) {
+            if (remotePlayer.player2->getParent()){
+                remotePlayer.player2->removeFromParent();
             }
         }
     }
@@ -1368,6 +1435,12 @@ void SyncManager::clearPeerState(uint32_t peerID) {
                 playerIt->second.player->removeFromParent();
             }
             playerIt->second.player->destroyObject();
+        }
+        if (playerIt->second.player2) {
+            if (playerIt->second.player2->getParent()) {
+                playerIt->second.player2->removeFromParent();
+            }
+            playerIt->second.player2->destroyObject();
         }
         m_remotePlayers.erase(playerIt);
     }

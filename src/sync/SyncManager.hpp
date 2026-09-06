@@ -13,10 +13,12 @@ using namespace geode::prelude;
 
 struct PendingAction;
 struct RemotePlayer {
-    PlayerObject* player;
-    std::string userId;
+    PlayerObject* player = nullptr;
+    PlayerObject* player2 = nullptr;
     uint8_t appliedGameMode = 255;
     int appliedIconFrame = -1;
+    uint8_t appliedGameMode2 = 255;
+    int appliedIconFrame2 = -1;
 };
 
 class SyncManager{
