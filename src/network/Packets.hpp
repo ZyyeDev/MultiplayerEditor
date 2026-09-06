@@ -139,6 +139,7 @@ struct PlayerPositionPacket{
     float x;
     float y;
     float rotation;
+    float playerScale;
     bool isUpsideDown;
     bool isGoingLeft;
     bool isDead;
@@ -148,6 +149,7 @@ struct PlayerPositionPacket{
     float x2;
     float y2;
     float rotation2;
+    float playerScale2;
     bool isUpsideDown2;
     bool isGoingLeft2;
     bool isDead2;

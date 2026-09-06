@@ -117,6 +117,7 @@ static void updateRemotePlayerVisual(
     float x,
     float y,
     float rotation,
+    float playerScale,
     bool upsideDown,
     bool goingLeft,
     bool dead
@@ -135,11 +136,11 @@ static void updateRemotePlayerVisual(
         appliedFrame = iconFrame;
     }
 
+    float scale = (playerScale > 0.01f) ? playerScale : 1.0f;
+    player->m_vehicleSize = scale;
     if (player->m_mainLayer) {
-        float sx = std::abs(player->m_mainLayer->getScaleX());
-        float sy = std::abs(player->m_mainLayer->getScaleY());
-        player->m_mainLayer->setScaleX(sx * (goingLeft ? -1.0f : 1.0f));
-        player->m_mainLayer->setScaleY(sy * (upsideDown ? -1.0f : 1.0f));
+        player->m_mainLayer->setScaleX(scale * (goingLeft ? -1.0f : 1.0f));
+        player->m_mainLayer->setScaleY(scale * (upsideDown ? -1.0f : 1.0f));
     }
 
     if (dead) {
@@ -1241,6 +1242,7 @@ void SyncManager::sendPlayerPosition(LevelEditorLayer* editorLayer, bool stopPla
     packet.x = plr->getPositionX();
     packet.y = plr->getPositionY();
     packet.rotation = plr->getRotation();
+    packet.playerScale = plr->m_vehicleSize > 0.01f ? plr->m_vehicleSize : 1.0f;
     packet.isUpsideDown = plr->m_isUpsideDown;
     packet.isGoingLeft = plr->m_isGoingLeft;
     packet.isDead = plr->m_isDead;
@@ -1253,6 +1255,7 @@ void SyncManager::sendPlayerPosition(LevelEditorLayer* editorLayer, bool stopPla
         packet.x2 = plr2->getPositionX();
         packet.y2 = plr2->getPositionY();
         packet.rotation2 = plr2->getRotation();
+        packet.playerScale2 = plr2->m_vehicleSize > 0.01f ? plr2->m_vehicleSize : 1.0f;
         packet.isUpsideDown2 = plr2->m_isUpsideDown;
         packet.isGoingLeft2 = plr2->m_isGoingLeft;
         packet.isDead2 = plr2->m_isDead;
@@ -1328,6 +1331,7 @@ void SyncManager::onRemotePlayerPosition(const PlayerPositionPacket& packet, Lev
         packet.x,
         packet.y,
         packet.rotation,
+        packet.playerScale,
         packet.isUpsideDown,
         packet.isGoingLeft,
         packet.isDead
@@ -1351,6 +1355,7 @@ void SyncManager::onRemotePlayerPosition(const PlayerPositionPacket& packet, Lev
                 packet.x2,
                 packet.y2,
                 packet.rotation2,
+                packet.playerScale2,
                 packet.isUpsideDown2,
                 packet.isGoingLeft2,
                 packet.isDead2
