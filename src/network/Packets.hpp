@@ -104,6 +104,18 @@ struct KickPacket {
     char kickReason[128];
 };
 
+enum class PlayerGameMode : uint8_t {
+    Cube = 0,
+    Ship = 1,
+    Ball = 2,
+    Ufo = 3,
+    Wave = 4,
+    Robot = 5,
+    Spider = 6,
+    Swing = 7,
+    Jetpack = 8,
+};
+
 struct PlayerIconData{
     int iconID;
     int shipID;
@@ -127,9 +139,23 @@ struct PlayerPositionPacket{
     float x;
     float y;
     float rotation;
+    float playerScale;
     bool isUpsideDown;
+    bool isGoingLeft;
     bool isDead;
     bool stopPlaytest;
+    uint8_t gameMode;
+    char robotAnim[32];
+    bool hasSecond;
+    float x2;
+    float y2;
+    float rotation2;
+    float playerScale2;
+    bool isUpsideDown2;
+    bool isGoingLeft2;
+    bool isDead2;
+    uint8_t gameMode2;
+    char robotAnim2[32];
     PlayerIconData iconData;
 };
 

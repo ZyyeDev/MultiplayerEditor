@@ -2,6 +2,7 @@
 #include <sstream>
 #include <cstring>
 #include <cstddef>
+#include <cmath>
 #include "SyncManager.hpp"
 #include "../network/NetworkManager.hpp"
 #include "../network/Packets.hpp"
@@ -9,6 +10,155 @@
 
 extern NetworkManager* g_network;
 extern bool g_isHost;
+
+static PlayerGameMode getLocalPlayerGameMode(PlayerObject* plr) {
+    if (plr->m_isShip) return PlayerGameMode::Ship;
+    if (plr->m_isBall) return PlayerGameMode::Ball;
+    if (plr->m_isBird) return PlayerGameMode::Ufo;
+    if (plr->m_isDart) return PlayerGameMode::Wave;
+    if (plr->m_isRobot) return PlayerGameMode::Robot;
+    if (plr->m_isSpider) return PlayerGameMode::Spider;
+    if (plr->m_isSwing) return PlayerGameMode::Swing;
+    return PlayerGameMode::Cube;
+}
+
+static int iconFrameForMode(PlayerGameMode mode, const PlayerIconData& iconData) {
+    switch (mode) {
+        case PlayerGameMode::Ship: return iconData.shipID;
+        case PlayerGameMode::Ball: return iconData.ballID;
+        case PlayerGameMode::Ufo: return iconData.ufoID;
+        case PlayerGameMode::Wave: return iconData.waveID;
+        case PlayerGameMode::Robot: return iconData.robotID;
+        case PlayerGameMode::Spider: return iconData.spiderID;
+        case PlayerGameMode::Swing: return iconData.swingID;
+        case PlayerGameMode::Jetpack: return iconData.jetpackID;
+        default: return iconData.iconID;
+    }
+}
+
+static void setIconForMode(PlayerObject* player, PlayerGameMode mode, const PlayerIconData& iconData) {
+    int frame = iconFrameForMode(mode, iconData);
+    switch (mode) {
+        case PlayerGameMode::Ship: player->updatePlayerShipFrame(frame); break;
+        case PlayerGameMode::Ball: player->updatePlayerRollFrame(frame); break;
+        case PlayerGameMode::Ufo: player->updatePlayerBirdFrame(frame); break;
+        case PlayerGameMode::Wave: player->updatePlayerDartFrame(frame); break;
+        case PlayerGameMode::Robot: player->updatePlayerRobotFrame(frame); break;
+        case PlayerGameMode::Spider: player->updatePlayerSpiderFrame(frame); break;
+        case PlayerGameMode::Swing: player->updatePlayerSwingFrame(frame); break;
+        case PlayerGameMode::Jetpack: player->updatePlayerJetpackFrame(frame); break;
+        default: player->updatePlayerFrame(frame); break;
+    }
+}
+
+static void applyRemotePlayerMode(PlayerObject* player, PlayerGameMode mode, const PlayerIconData& iconData, PlayerGameMode prevMode) {
+    if (mode == prevMode) {
+        setIconForMode(player, mode, iconData);
+        return;
+    }
+
+    player->toggleFlyMode(false, true);
+    player->toggleRollMode(false, true);
+    player->toggleBirdMode(false, true);
+    player->toggleDartMode(false, true);
+    player->toggleRobotMode(false, true);
+    player->toggleSpiderMode(false, true);
+    player->toggleSwingMode(false, true);
+
+    switch (mode) {
+        case PlayerGameMode::Ship: player->toggleFlyMode(true, true); break;
+        case PlayerGameMode::Ball: player->toggleRollMode(true, true); break;
+        case PlayerGameMode::Ufo: player->toggleBirdMode(true, true); break;
+        case PlayerGameMode::Wave: player->toggleDartMode(true, true); break;
+        case PlayerGameMode::Robot: player->toggleRobotMode(true, true); break;
+        case PlayerGameMode::Spider: player->toggleSpiderMode(true, true); break;
+        case PlayerGameMode::Swing: player->toggleSwingMode(true, true); break;
+        default: break;
+    }
+
+    setIconForMode(player, mode, iconData);
+}
+
+static PlayerObject* createRemotePlayerVisual(LevelEditorLayer* editorLayer, const PlayerIconData& iconData, bool isSecond) {
+    auto remotePlayer = PlayerObject::create(
+        iconData.iconID,
+        iconData.shipID,
+        editorLayer,
+        editorLayer->m_objectLayer,
+        false
+    );
+
+    if (!remotePlayer) return nullptr;
+
+    remotePlayer->setOpacity(200);
+    remotePlayer->setZOrder(1000);
+
+    auto gameManager = GameManager::sharedState();
+    remotePlayer->setColor(gameManager->colorForIdx(iconData.color1ID));
+    remotePlayer->setSecondColor(gameManager->colorForIdx(iconData.color2ID));
+
+    if (iconData.hasGlow) {
+        remotePlayer->enableCustomGlowColor(gameManager->colorForIdx(iconData.glowColor));
+    } else {
+        remotePlayer->disableCustomGlowColor();
+    }
+
+    if (isSecond) remotePlayer->m_isSecondPlayer = true;
+
+    return remotePlayer;
+}
+
+static void updateRemotePlayerVisual(
+    PlayerObject* player,
+    uint8_t& appliedMode,
+    int& appliedFrame,
+    PlayerGameMode gameMode,
+    const PlayerIconData& iconData,
+    float x,
+    float y,
+    float rotation,
+    float playerScale,
+    bool upsideDown,
+    bool goingLeft,
+    bool dead,
+    const std::string& robotAnim,
+    std::string& appliedRobotAnim
+) {
+    if (!player) return;
+
+    player->setPosition(ccp(x, y));
+    player->setRotation(rotation);
+    player->m_isUpsideDown = upsideDown;
+    player->m_isGoingLeft = goingLeft;
+
+    int iconFrame = iconFrameForMode(gameMode, iconData);
+    if (appliedMode != static_cast<uint8_t>(gameMode) || appliedFrame != iconFrame) {
+        applyRemotePlayerMode(player, gameMode, iconData, static_cast<PlayerGameMode>(appliedMode));
+        appliedMode = static_cast<uint8_t>(gameMode);
+        appliedFrame = iconFrame;
+        appliedRobotAnim.clear();
+    }
+
+    float scale = (playerScale > 0.01f) ? playerScale : 1.0f;
+    player->m_vehicleSize = scale;
+    if (player->m_mainLayer) {
+        player->m_mainLayer->setScaleX(scale * (goingLeft ? -1.0f : 1.0f));
+        player->m_mainLayer->setScaleY(scale * (upsideDown ? -1.0f : 1.0f));
+    }
+
+    if (gameMode == PlayerGameMode::Robot && player->m_robotSprite && !robotAnim.empty() && robotAnim != appliedRobotAnim) {
+        player->m_robotSprite->runAnimation(robotAnim);
+        appliedRobotAnim = robotAnim;
+    }
+
+    if (dead) {
+        player->m_isDead = true;
+        player->setVisible(false);
+    } else {
+        player->m_isDead = false;
+        player->setVisible(true);
+    }
+}
 
 SyncManager::SyncManager() : m_objectCounter(0), m_lastUpdateTimestamp(0) {
     m_userID = g_network->getPeerID();
@@ -1074,6 +1224,9 @@ void SyncManager::updatePlayerSync(float dt, LevelEditorLayer* editorLayer, bool
         if (remotePlr.player && !remotePlr.player->m_isDead){
             remotePlr.player->setVisible(true);
         }
+        if (remotePlr.player2 && !remotePlr.player2->m_isDead){
+            remotePlr.player2->setVisible(true);
+        }
     }
 }
 
@@ -1097,9 +1250,36 @@ void SyncManager::sendPlayerPosition(LevelEditorLayer* editorLayer, bool stopPla
     packet.x = plr->getPositionX();
     packet.y = plr->getPositionY();
     packet.rotation = plr->getRotation();
+    packet.playerScale = plr->m_vehicleSize > 0.01f ? plr->m_vehicleSize : 1.0f;
     packet.isUpsideDown = plr->m_isUpsideDown;
+    packet.isGoingLeft = plr->m_isGoingLeft;
     packet.isDead = plr->m_isDead;
     packet.stopPlaytest = stopPlaytest;
+    packet.gameMode = static_cast<uint8_t>(getLocalPlayerGameMode(plr));
+
+    packet.robotAnim[0] = '\0';
+    if (plr->m_isRobot && !plr->m_currentRobotAnimation.empty()) {
+        strncpy(packet.robotAnim, plr->m_currentRobotAnimation.c_str(), sizeof(packet.robotAnim) - 1);
+        packet.robotAnim[sizeof(packet.robotAnim) - 1] = '\0';
+    }
+
+    auto plr2 = editorLayer->m_player2;
+    packet.hasSecond = plr2 && plr2->getParent() != nullptr;
+    if (packet.hasSecond) {
+        packet.x2 = plr2->getPositionX();
+        packet.y2 = plr2->getPositionY();
+        packet.rotation2 = plr2->getRotation();
+        packet.playerScale2 = plr2->m_vehicleSize > 0.01f ? plr2->m_vehicleSize : 1.0f;
+        packet.isUpsideDown2 = plr2->m_isUpsideDown;
+        packet.isGoingLeft2 = plr2->m_isGoingLeft;
+        packet.isDead2 = plr2->m_isDead;
+        packet.gameMode2 = static_cast<uint8_t>(getLocalPlayerGameMode(plr2));
+        packet.robotAnim2[0] = '\0';
+        if (plr2->m_isRobot && !plr2->m_currentRobotAnimation.empty()) {
+            strncpy(packet.robotAnim2, plr2->m_currentRobotAnimation.c_str(), sizeof(packet.robotAnim2) - 1);
+            packet.robotAnim2[sizeof(packet.robotAnim2) - 1] = '\0';
+        }
+    }
 
     packet.iconData.iconID = gameManager->getPlayerFrame();
     packet.iconData.shipID = gameManager->getPlayerShip();
@@ -1135,68 +1315,82 @@ void SyncManager::onRemotePlayerPosition(const PlayerPositionPacket& packet, Lev
                 remotePlayer->setVisible(false);
                 remotePlayer->destroyObject();
             }
+            auto remotePlayer2 = it->second.player2;
+            if (remotePlayer2){
+                remotePlayer2->setVisible(false);
+                remotePlayer2->destroyObject();
+            }
             m_remotePlayers.erase(it);
         }
         return;
     }
 
     if (it == m_remotePlayers.end()) {
-        auto remotePlayer = PlayerObject::create(
-            packet.iconData.iconID,
-            packet.iconData.shipID,
-            editorLayer,
-            editorLayer->m_objectLayer,
-            false
-        );
-
-        if (!remotePlayer) {
+        RemotePlayer rp;
+        rp.player = createRemotePlayerVisual(editorLayer, packet.iconData, false);
+        if (!rp.player) {
             log::error("Failed to create remote player!");
             return;
         }
-        
-        remotePlayer->setOpacity(200);
-        remotePlayer->setPosition(ccp(packet.x, packet.y));
-        remotePlayer->setRotation(packet.rotation);
-        remotePlayer->m_isUpsideDown = packet.isUpsideDown;
-        remotePlayer->m_isDead = packet.isDead;
-        
-        auto gameManager = GameManager::sharedState();
-        remotePlayer->setColor(gameManager->colorForIdx(packet.iconData.color1ID));
-        remotePlayer->setSecondColor(gameManager->colorForIdx(packet.iconData.color2ID));
-        remotePlayer->setZOrder(1000);
-        
-        if (packet.iconData.hasGlow) {
-            remotePlayer->enableCustomGlowColor(gameManager->colorForIdx(packet.iconData.glowColor));
-        } else {
-            remotePlayer->disableCustomGlowColor();
-        }
-        
-        editorLayer->m_objectLayer->addChild(remotePlayer);
-        
-        RemotePlayer rp;
-        rp.player = remotePlayer;
-        rp.userId = userId;
+        rp.appliedGameMode = static_cast<uint8_t>(PlayerGameMode::Cube);
+        editorLayer->m_objectLayer->addChild(rp.player);
         m_remotePlayers[userId] = rp;
         
         log::info("Created remote player for user: {}", userId);
-    } else {
-        auto remotePlayer = it->second.player;
-        if (!remotePlayer){
-            log::error("remote player is null!");
-            return;
-        }
+    }
 
-        remotePlayer->setPosition(ccp(packet.x, packet.y));
-        remotePlayer->setRotation(packet.rotation);
-        remotePlayer->m_isUpsideDown = packet.isUpsideDown;
+    auto& rp = m_remotePlayers[userId];
 
-        if (packet.isDead) {
-            remotePlayer->m_isDead = true;
-            remotePlayer->setVisible(false);
-        } else {
-            remotePlayer->m_isDead = false;
-            remotePlayer->setVisible(true);
+    updateRemotePlayerVisual(
+        rp.player,
+        rp.appliedGameMode,
+        rp.appliedIconFrame,
+        static_cast<PlayerGameMode>(packet.gameMode),
+        packet.iconData,
+        packet.x,
+        packet.y,
+        packet.rotation,
+        packet.playerScale,
+        packet.isUpsideDown,
+        packet.isGoingLeft,
+        packet.isDead,
+        safeStr(packet.robotAnim),
+        rp.appliedRobotAnim
+    );
+
+    if (packet.hasSecond) {
+        if (!rp.player2) {
+            rp.player2 = createRemotePlayerVisual(editorLayer, packet.iconData, true);
+            if (rp.player2) {
+                rp.appliedGameMode2 = static_cast<uint8_t>(PlayerGameMode::Cube);
+                editorLayer->m_objectLayer->addChild(rp.player2);
+            }
         }
+        if (rp.player2) {
+            updateRemotePlayerVisual(
+                rp.player2,
+                rp.appliedGameMode2,
+                rp.appliedIconFrame2,
+                static_cast<PlayerGameMode>(packet.gameMode2),
+                packet.iconData,
+                packet.x2,
+                packet.y2,
+                packet.rotation2,
+                packet.playerScale2,
+                packet.isUpsideDown2,
+                packet.isGoingLeft2,
+                packet.isDead2,
+                safeStr(packet.robotAnim2),
+                rp.appliedRobotAnim2
+            );
+        }
+    } else if (rp.player2) {
+        rp.player2->setVisible(false);
+        rp.player2->destroyObject();
+        rp.player2 = nullptr;
+        rp.appliedGameMode2 = 255;
+        rp.appliedIconFrame2 = -1;
+        rp.appliedRobotAnim2.clear();
     }
 }
 
@@ -1205,6 +1399,11 @@ void SyncManager::cleanUpPlayers() {
         if (remotePlayer.player) {
             if (remotePlayer.player->getParent()){
                 remotePlayer.player->removeFromParent();
+            }
+        }
+        if (remotePlayer.player2) {
+            if (remotePlayer.player2->getParent()){
+                remotePlayer.player2->removeFromParent();
             }
         }
     }
@@ -1279,6 +1478,12 @@ void SyncManager::clearPeerState(uint32_t peerID) {
                 playerIt->second.player->removeFromParent();
             }
             playerIt->second.player->destroyObject();
+        }
+        if (playerIt->second.player2) {
+            if (playerIt->second.player2->getParent()) {
+                playerIt->second.player2->removeFromParent();
+            }
+            playerIt->second.player2->destroyObject();
         }
         m_remotePlayers.erase(playerIt);
     }
