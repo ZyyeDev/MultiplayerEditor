@@ -4,7 +4,6 @@
 #include <Geode/modify/GJBaseGameLayer.hpp>
 #include <Geode/modify/CCScheduler.hpp>
 #include <Geode/modify/GJEffectManager.hpp>
-#include <Geode/modify/ColorSelectPopup.hpp>
 
 #include <map>
 #include <string>
@@ -430,15 +429,5 @@ class $modify(MyEditorUI, EditorUI) {
         tracked.clear();
         
         EditorUI::deselectAll();
-    }
-};
-
-class $modify(ColorSelectPopup) {
-    void colorValueChanged(ccColor3B color) {
-        ColorSelectPopup::colorValueChanged(color);
-
-        if (g_isInSession && g_sync && !g_sync->isApplyingRemoteChanges() && m_colorAction) {
-            g_sync->syncColorAction(m_colorAction);
-        }
     }
 };

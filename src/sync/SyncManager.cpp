@@ -467,7 +467,7 @@ void SyncManager::sendFullState(uint32_t targetPeerID) {
 
     }
 
-    sendAllColors(targetPeerID);
+    //sendAllColors(targetPeerID);
     onLocalLevelSettingsChanged();
 
     FullSyncEndPacket endPkt;
@@ -689,6 +689,7 @@ void SyncManager::handlePacket(const uint8_t* data, size_t size) {
             break;
         }
         case PacketType::COLOR_SYNC: {
+            /*
             if (size < offsetof(ColorChannelsPacket, colorDat)) break;
             const ColorChannelsPacket* packet = reinterpret_cast<const ColorChannelsPacket*>(data);
             if (packet->count > 1000) break;
@@ -700,6 +701,7 @@ void SyncManager::handlePacket(const uint8_t* data, size_t size) {
             {
                 restoreColor(i);
             }
+            */
             
             break;
         }
@@ -1455,7 +1457,7 @@ void SyncManager::clearPeerState(uint32_t peerID) {
         m_remoteCursors.erase(cursorIt);
     }
 
-    // remove selection highlights
+    // remove select highlights
     auto highlightsIt = m_remoteSelectionHighlights.find(peerID);
     if (highlightsIt != m_remoteSelectionHighlights.end()) {
         for (auto sprite : highlightsIt->second) {
@@ -1467,10 +1469,10 @@ void SyncManager::clearPeerState(uint32_t peerID) {
         m_remoteSelectionHighlights.erase(highlightsIt);
     }
 
-    // remove selection data
+    // remove select data
     m_remoteSelections.erase(peerID);
 
-    // remove remote player
+    // remove player
     auto playerIt = m_remotePlayers.find(peerID);
     if (playerIt != m_remotePlayers.end()) {
         if (playerIt->second.player) {
@@ -1493,90 +1495,4 @@ GJEffectManager* SyncManager::getActiveEffectManager(){
     if (auto pl = PlayLayer::get()) return pl->m_effectManager;
     if (auto lel = LevelEditorLayer::get()) return lel->m_effectManager;
     return nullptr;
-}
-
-void SyncManager::restoreColor(SavedColorData ColorData) {
-    auto mgr = getActiveEffectManager();
-    if (!mgr) return;
-
-    auto action = ColorAction::create({ColorData.r, ColorData.g, ColorData.b}, ColorData.blending, -1);
-    action->m_colorID = ColorData.colorID;
-    action->m_currentOpacity = ColorData.opacity;
-    action->m_copyID= ColorData.copyID;
-
-    m_applyingRemoteChanges = true;
-    mgr->setColorAction(action, ColorData.colorID);
-    m_applyingRemoteChanges = false;
-}
-
-std::unordered_map<int, ccColor3B> SyncManager::getAllChannelColors() {
-    std::unordered_map<int, ccColor3B> result;
-    auto mgr = getActiveEffectManager();
-    if (!mgr) return result;
-
-    auto actions = mgr->getAllColorActions();
-    if (!actions) return result;
-
-    for (auto action : CCArrayExt<ColorAction*>(actions)) {
-        result[action->m_colorID] = action->m_fromColor;
-    }
-
-    return result;
-}
-
-void SyncManager::syncColorAction(ColorAction* action){
-    auto newColor = action->m_fromColor;
-
-    SavedColorData data;
-    data.colorID = action->m_colorID;
-    data.r = newColor.r;
-    data.g = newColor.g;
-    data.b = newColor.b;
-    data.blending = action->m_blending ? 1 : 0;
-    data.opacity = action->m_currentOpacity;
-    data.copyID = action->m_copyID;
-
-    ColorChannelsPacket packet{};
-    packet.header.type = PacketType::COLOR_SYNC;
-    packet.header.timestamp = getCurrentTimestamp();
-    packet.header.senderID = g_network->getPeerID();
-    packet.count = 1;
-    packet.colorDat[0] = data;
-    
-    size_t sendSize = offsetof(ColorChannelsPacket, colorDat) + packet.count * sizeof(SavedColorData);
-    g_network->sendPacket(&packet, sendSize);
-}
-
-void SyncManager::sendAllColors(uint32_t targetPeerID) {
-    auto mgr = getActiveEffectManager();
-    if (!mgr) return;
-    auto actions = mgr->getAllColorActions();
-    if (!actions || actions->count() == 0) return;
-
-    ColorChannelsPacket packet{};
-    packet.header.type = PacketType::COLOR_SYNC;
-    packet.header.timestamp = getCurrentTimestamp();
-    packet.header.senderID = g_network->getPeerID();
-
-    size_t count = 0;
-    for (auto action : CCArrayExt<ColorAction*>(actions)) {
-        if (count >= 1000 || !action) break;
-        packet.colorDat[count].colorID = action->m_colorID;
-        packet.colorDat[count].r = action->m_fromColor.r;
-        packet.colorDat[count].g = action->m_fromColor.g;
-        packet.colorDat[count].b = action->m_fromColor.b;
-        packet.colorDat[count].blending = action->m_blending ? 1 : 0;
-        packet.colorDat[count].opacity = action->m_currentOpacity;
-        packet.colorDat[count].copyID = action->m_copyID;
-        count++;
-    }
-    packet.count = count;
-
-    size_t sendSize = offsetof(ColorChannelsPacket, colorDat) + packet.count * sizeof(SavedColorData);
-
-    if (targetPeerID != 0) {
-        g_network->sendPacketToPeer(targetPeerID, &packet, sendSize);
-    } else {
-        g_network->sendPacket(&packet, sendSize);
-    }
 }

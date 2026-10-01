@@ -325,7 +325,7 @@ void NetworkManager::poll(){
                     removePeer(disconnectedPeerID);
                     m_connectedPeers.erase(disconnectedPeerID);
                     broadcastPeerLeft(disconnectedPeerID);
-                    // Clean up sync state on host (PEER_LEFT broadcast doesnt reach host)
+                    
                     extern SyncManager* g_sync;
                     if (g_sync) {
                         g_sync->clearPeerState(disconnectedPeerID);
@@ -430,8 +430,6 @@ void NetworkManager::gotKicked(std::string reason){
 }
 
 void NetworkManager::setPeerTimeouts() {
-    // Increase enet timeouts so the connection survives window minimize
-    // Default timeout is 5s, increasing to 60s
     if (m_isHost) {
         for (auto& [id, peer] : m_connectedPeers) {
             if (peer) {
