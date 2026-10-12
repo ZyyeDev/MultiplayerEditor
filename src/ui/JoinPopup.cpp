@@ -122,41 +122,62 @@ void JoinPopup::OnJoin(CCObject*) {
     CCTouchDispatcher::get()->setDispatchEvents(false);
     loadcircle->setParentLayer(bg);
     loadcircle->show();
+
     std::thread([loadcircle, bg, ip, port, password]() {
-        GJGameLevel* level = nullptr;
+        bool connected = g_network->connect(ip, port, password);
 
-        if (g_network->connect(ip,port,password)) {
-            g_isHost = false;
-            g_isInSession = true;
-            g_sync->setUserID(g_network->getPeerID());
-            //get level
-            level = GJGameLevel::create();
-            level->init();
-            
-            level->m_levelName = "Collab Session";
-            level->m_dontSave = true;
-            level->m_levelIndex = -1;
-            level->m_levelID = 0;
-            level->m_levelType = GJLevelType::Editor;
+        geode::queueInMainThread(
+            [loadcircle, bg, connected]() {
+                loadcircle->fadeAndRemove();
+                bg->removeFromParent();
+                CCTouchDispatcher::get()->setDispatchEvents(true);
 
-            if (!level->m_lastBuildSave){
-                level->m_lastBuildSave = CCDictionary::create();
-                level->m_lastBuildSave->retain();
-            }
-        }
+                if (!connected) {
+                    FLAlertLayer::create(
+                        "Connection Failed",
+                        "Couldn't connect to host!",
+                        "OK"
+                    )->show();
+                    return;
+                }
 
-        geode::queueInMainThread([loadcircle, bg, level]() {
-            loadcircle->fadeAndRemove();
-            bg->removeFromParent();
-            CCTouchDispatcher::get()->setDispatchEvents(true);
-            if (level) {
-                auto scene = CCScene::create();
+                auto level = GJGameLevel::create();
+                if (!level) {
+                    FLAlertLayer::create(
+                        "Error",
+                        "Couldn't create the session level!",
+                        "OK"
+                    )->show();
+                    return;
+                }
+
+                g_isHost = false;
+                g_isInSession = true;
+                g_sync->setUserID(g_network->getPeerID());
+
+                level->m_levelName = "Collab Session";
+                level->m_dontSave = true;
+                level->m_levelIndex = -1;
+                level->m_levelID = 0;
+                level->m_levelType = GJLevelType::Editor;
+
                 auto editorLayer = LevelEditorLayer::create(level, false);
+                if (!editorLayer) {
+                    FLAlertLayer::create(
+                        "Error",
+                        "Couldn't initialize the session editor!",
+                        "OK"
+                    )->show();
+                    return;
+                }
+
+                auto scene = CCScene::create();
                 scene->addChild(editorLayer);
-                CCDirector::sharedDirector()->replaceScene(CCTransitionFade::create(0.5f,scene));
-            } else {
-                FLAlertLayer::create("Connection Failed", "Couldn't connect to host!", "OK")->show();
+
+                CCDirector::sharedDirector()->replaceScene(
+                    CCTransitionFade::create(0.5f, scene)
+                );
             }
-        });
+        );
     }).detach();
 }
