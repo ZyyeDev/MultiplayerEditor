@@ -3,7 +3,6 @@
 #include <Geode/modify/EditorUI.hpp>
 #include <Geode/modify/GJBaseGameLayer.hpp>
 #include <Geode/modify/CCScheduler.hpp>
-#include <Geode/modify/GJEffectManager.hpp>
 
 #include <map>
 #include <string>
@@ -70,6 +69,16 @@ class $modify(MyLevelEditorLayer, LevelEditorLayer){
         }
     };
     
+    bool init(GJGameLevel* level, bool noUI) {
+        if (!LevelEditorLayer::init(level, noUI)) return false;
+        
+        if (g_isInSession && g_network && !g_isHost){
+            g_network->requestFullSync = true;
+        }
+
+        return true;
+    }
+
     void onExit() {
         LevelEditorLayer::onExit();
         
@@ -156,16 +165,6 @@ class $modify(MyLevelEditorLayer, LevelEditorLayer){
         LevelEditorLayer::onStopPlaytest();
     }
 
-    bool init(GJGameLevel* level, bool noUI) {
-        if (!LevelEditorLayer::init(level, noUI)) return false;
-        
-        if (g_isInSession && g_network && !g_isHost){
-            g_network->requestFullSync = true;
-        }
-
-        return true;;
-    }
-
     GameObject* createObject(int key, CCPoint position, bool noUndo) {
         auto obj = LevelEditorLayer::createObject(key, position, noUndo);
 
@@ -239,6 +238,7 @@ class $modify(MyEditorUI, EditorUI) {
         if (!editor || !editor->m_objects) return;
 
         g_sync->pruneStaleTrackedObjects();
+        g_sync->updateColorSync();
 
         for (auto obj : CCArrayExt<GameObject*>(editor->m_objects)) {
             if (obj && !g_sync->isTrackedObject(obj)) {
@@ -316,16 +316,12 @@ class $modify(MyEditorUI, EditorUI) {
 
             if (!stillSelected) {
                 if (current != it->second) {
-                    if (obj->m_objectID != 31) {
-                        g_sync->onLocalObjectModified(obj);
-                    }
+                    g_sync->onLocalObjectModified(obj);
                 }
                 it = tracked.erase(it);
             } else {
                 if (current != it->second) {
-                    if (obj->m_objectID != 31) {
-                        g_sync->onLocalObjectModified(obj);
-                    }
+                    g_sync->onLocalObjectModified(obj);
                     it->second = current;
                 }
                 ++it;
@@ -414,10 +410,6 @@ class $modify(MyEditorUI, EditorUI) {
     void songStateChanged() {
         EditorUI::songStateChanged();
         settingsUpdate();
-    }
-
-    void selectObjects(CCArray* objects, bool idk) {
-        EditorUI::selectObjects(objects, idk);
     }
 
     void deselectAll() {

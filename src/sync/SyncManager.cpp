@@ -3,6 +3,7 @@
 #include <cstring>
 #include <cstddef>
 #include <cmath>
+#include <memory>
 #include "SyncManager.hpp"
 #include "../network/NetworkManager.hpp"
 #include "../network/Packets.hpp"
@@ -10,6 +11,7 @@
 
 extern NetworkManager* g_network;
 extern bool g_isHost;
+extern bool g_isPlaytesting;
 
 static PlayerGameMode getLocalPlayerGameMode(PlayerObject* plr) {
     if (plr->m_isShip) return PlayerGameMode::Ship;
@@ -467,7 +469,7 @@ void SyncManager::sendFullState(uint32_t targetPeerID) {
 
     }
 
-    //sendAllColors(targetPeerID);
+    sendAllColors(targetPeerID);
     onLocalLevelSettingsChanged();
 
     FullSyncEndPacket endPkt;
@@ -689,20 +691,7 @@ void SyncManager::handlePacket(const uint8_t* data, size_t size) {
             break;
         }
         case PacketType::COLOR_SYNC: {
-            /*
-            if (size < offsetof(ColorChannelsPacket, colorDat)) break;
-            const ColorChannelsPacket* packet = reinterpret_cast<const ColorChannelsPacket*>(data);
-            if (packet->count > 1000) break;
-            size_t expectedSize = offsetof(ColorChannelsPacket, colorDat) + packet->count * sizeof(SavedColorData);
-            if (size < expectedSize) break;
-            std::vector<SavedColorData> colors(packet->colorDat, packet->colorDat + packet->count);
-
-            for (auto i : colors)
-            {
-                restoreColor(i);
-            }
-            */
-            
+            onRemoteColorsChanged(*reinterpret_cast<const ColorChannelsPacket*>(data), size);
             break;
         }
         case PacketType::SELECT_CHANGE: {
@@ -747,14 +736,6 @@ void SyncManager::handlePacket(const uint8_t* data, size_t size) {
             log::warn("Unknown packet type: {}", (int)header->type);
             break;
     }
-}
-
-bool SyncManager::shouldApplyUpdate(uint32_t remoteTimestamp) {
-    if (remoteTimestamp >= m_lastUpdateTimestamp) {
-        m_lastUpdateTimestamp = remoteTimestamp;
-        return true;
-    }
-    return false;
 }
 
 void SyncManager::onLocalCursorUpdate(CCPoint position){
@@ -1444,6 +1425,10 @@ void SyncManager::clearAllRemoteState(){
     m_incomingChunks.clear();
     m_pendingObjectUpdates.clear();
 
+    m_lastColors.clear();
+    m_pendingColors.clear();
+    m_colorsSeeded = false;
+
     MouseTooltip::get()->clear();
 }
 
@@ -1491,8 +1476,206 @@ void SyncManager::clearPeerState(uint32_t peerID) {
     }
 }
 
-GJEffectManager* SyncManager::getActiveEffectManager(){
-    if (auto pl = PlayLayer::get()) return pl->m_effectManager;
-    if (auto lel = LevelEditorLayer::get()) return lel->m_effectManager;
-    return nullptr;
+std::vector<GJEffectManager*> SyncManager::getColorManagers() {
+    std::vector<GJEffectManager*> managers;
+    auto editor = getEditorLayer();
+    if (!editor) return managers;
+
+    if (editor->m_levelSettings && editor->m_levelSettings->m_effectManager) {
+        managers.push_back(editor->m_levelSettings->m_effectManager);
+    }
+    if (editor->m_effectManager && (managers.empty() || managers[0] != editor->m_effectManager)) {
+        managers.push_back(editor->m_effectManager);
+    }
+    return managers;
+}
+
+bool SyncManager::isSyncableColorChannel(int id) {
+    if (id >= 1 && id <= 999) return true;
+    return (id >= 1000 && id <= 1012);
+}
+
+bool SyncManager::readColor(GJEffectManager* manager, int id, SavedColorData& out) {
+    if (!manager || !manager->colorExists(id)) return false;
+
+    auto action = manager->getColorAction(id);
+    if (!action) return false;
+
+    memset(&out, 0, sizeof(out));
+    out.colorID = id;
+    out.fromR = action->m_fromColor.r;
+    out.fromG = action->m_fromColor.g;
+    out.fromB = action->m_fromColor.b;
+    out.toR = action->m_toColor.r;
+    out.toG = action->m_toColor.g;
+    out.toB = action->m_toColor.b;
+
+    out.blending = action->m_blending;
+    out.copyOpacity = action->m_copyOpacity;
+    out.legacyHSV = action->m_legacyHSV;
+    out.absoluteSaturation = action->m_copyHSV.absoluteSaturation;
+    out.absoluteBrightness = action->m_copyHSV.absoluteBrightness;
+
+    out.fromOpacity = action->m_fromOpacity;
+    out.toOpacity = action->m_toOpacity;
+    out.hue = action->m_copyHSV.h;
+    out.saturation = action->m_copyHSV.s;
+    out.value = action->m_copyHSV.v;
+    out.copyID = action->m_copyID;
+    out.playerColor = action->m_playerColor;
+    return true;
+}
+
+void SyncManager::collectColors(std::vector<SavedColorData>& out) {
+    auto managers = getColorManagers();
+    if (managers.empty()) return;
+
+    auto manager = managers[0];
+    SavedColorData data;
+
+    for (int id = 1; id <= 999; id++) {
+        if (readColor(manager, id, data)) out.push_back(data);
+    }
+    for (int id : {1000, 1001,1002, 1003,1004, 1009,1010,1011,1012}) {
+        if (readColor(manager, id, data)) out.push_back(data);
+    }
+}
+
+void SyncManager::sendColors(const std::vector<SavedColorData>& colors, uint32_t targetPeerID) {
+    if (!g_network || colors.empty()) return;
+
+    auto packet = std::make_unique<ColorChannelsPacket>();
+
+    for (size_t offset = 0; offset < colors.size(); offset += maxColorsPerPacket) {
+        size_t count = std::min(colors.size() - offset, (size_t)maxColorsPerPacket);
+
+        packet->header.type = PacketType::COLOR_SYNC;
+        packet->header.timestamp = getCurrentTimestamp();
+        packet->header.senderID = g_network->getPeerID();
+        packet->count = (uint32_t)count;
+        memcpy(packet->colorDat, colors.data() + offset, count * sizeof(SavedColorData));
+
+        size_t packetSize = offsetof(ColorChannelsPacket, colorDat) + count * sizeof(SavedColorData);
+
+        if (targetPeerID == 0) {
+            g_network->sendPacket(packet.get(), packetSize);
+        } else {
+            g_network->sendPacketToPeer(targetPeerID, packet.get(), packetSize);
+        }
+    }
+}
+
+void SyncManager::sendAllColors(uint32_t targetPeerID) {
+    std::vector<SavedColorData> colors;
+    collectColors(colors);
+    sendColors(colors, targetPeerID);
+}
+
+void SyncManager::applyColors(const std::vector<SavedColorData>& colors) {
+    auto editor = getEditorLayer();
+    auto managers = getColorManagers();
+    if (!editor || managers.empty() || colors.empty()) return;
+
+    m_applyingRemoteChanges = true;
+
+    for (auto const& data : colors) {
+        if (!isSyncableColorChannel(data.colorID)) continue;
+
+        for (auto manager : managers) {
+            auto action = manager->getColorAction(data.colorID);
+            if (!action) {
+                action = ColorAction::create();
+                action->m_colorID = data.colorID;
+                manager->setColorAction(action, data.colorID);
+            }
+
+            ccColor3B from = ccc3(data.fromR, data.fromG, data.fromB);
+            ccColor3B to = ccc3(data.toR, data.toG, data.toB);
+
+            action->m_color = to;
+            action->m_fromColor = from;
+            action->m_toColor = to;
+            action->m_currentOpacity = data.toOpacity;
+            action->m_fromOpacity = data.fromOpacity;
+            action->m_toOpacity = data.toOpacity;
+            action->m_blending = data.blending;
+            action->m_playerColor = data.playerColor;
+            action->m_copyID = data.copyID;
+            action->m_copyOpacity = data.copyOpacity;
+            action->m_legacyHSV = data.legacyHSV;
+            action->m_copyHSV.absoluteSaturation = data.absoluteSaturation;
+            action->m_copyHSV.absoluteBrightness = data.absoluteBrightness;
+            action->m_copyHSV.h = data.hue;
+            action->m_copyHSV.s = data.saturation;
+            action->m_copyHSV.v = data.value;
+
+            manager->colorActionChanged(action);
+            manager->updateColorAction(action);
+        }
+
+        SavedColorData applied;
+        if (readColor(managers[0], data.colorID, applied)) {
+            m_lastColors[data.colorID] = applied;
+        }
+    }
+
+    editor->levelSettingsUpdated();
+    if (editor->m_objects) {
+        editor->updateObjectColors(editor->m_objects);
+    }
+
+    m_applyingRemoteChanges = false;
+}
+
+void SyncManager::onRemoteColorsChanged(const ColorChannelsPacket& packet, size_t size) {
+    if (size < offsetof(ColorChannelsPacket, colorDat)) return;
+    if (packet.count > maxColorsPerPacket) return;
+    if (size < offsetof(ColorChannelsPacket, colorDat) + packet.count * sizeof(SavedColorData)) return;
+
+    for (uint32_t i = 0; i < packet.count; i++) {
+        if (!isSyncableColorChannel(packet.colorDat[i].colorID)) continue;
+        m_pendingColors[packet.colorDat[i].colorID] = packet.colorDat[i];
+    }
+
+    flushPendingColors();
+}
+
+void SyncManager::flushPendingColors() {
+    if (m_pendingColors.empty()) return;
+    if (g_isPlaytesting || isPopupBlockingLevelSettings()) return;
+    if (!getEditorLayer()) return;
+
+    std::vector<SavedColorData> colors;
+    colors.reserve(m_pendingColors.size());
+    for (auto const& [id, data] : m_pendingColors) {
+        colors.push_back(data);
+    }
+    m_pendingColors.clear();
+
+    applyColors(colors);
+}
+
+void SyncManager::updateColorSync() {
+    if (!getEditorLayer()) return;
+
+    flushPendingColors();
+
+    std::vector<SavedColorData> current;
+    collectColors(current);
+
+    std::vector<SavedColorData> changed;
+    for (auto const& data : current) {
+        auto it = m_lastColors.find(data.colorID);
+        if (it != m_lastColors.end() && memcmp(&it->second, &data, sizeof(SavedColorData)) == 0) continue;
+
+        m_lastColors[data.colorID] = data;
+        changed.push_back(data);
+    }
+
+    if (!m_colorsSeeded) {
+        m_colorsSeeded = true;
+        return;
+    }
+
+    sendColors(changed, 0);
 }

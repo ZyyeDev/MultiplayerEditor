@@ -8,6 +8,7 @@
 #include <Geode/Geode.hpp>
 
 const int maxPlayers = 128;
+const int maxColorsPerPacket = 128;
 
 enum class PacketType : uint8_t {
     HANDSHAKE = 0,
@@ -32,12 +33,26 @@ enum class PacketType : uint8_t {
 
 struct SavedColorData {
     int32_t colorID;
-    uint8_t r;
-    uint8_t g;
-    uint8_t b;
-    uint8_t blending;
-    float opacity;
+    uint8_t fromR;
+    uint8_t fromG;
+    uint8_t fromB;
+    uint8_t toR;
+    uint8_t toG;
+    uint8_t toB;
+
+    bool blending;
+    bool copyOpacity;
+    bool legacyHSV;
+    bool absoluteSaturation;
+    bool absoluteBrightness;
+
+    float fromOpacity;
+    float toOpacity;
+    float hue;
+    float saturation;
+    float value;
     int32_t copyID;
+    int32_t playerColor;
 };
 
 struct PacketHeader{
@@ -82,7 +97,7 @@ struct MousePacket{
 struct ColorChannelsPacket{
     PacketHeader header;
     uint32_t count;
-    SavedColorData colorDat[1000];
+    SavedColorData colorDat[maxColorsPerPacket];
 };
 
 struct LevelSettingsPacket {

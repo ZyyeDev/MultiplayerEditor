@@ -36,7 +36,6 @@ class SyncManager{
 
         std::string generateUID();
 
-        bool shouldApplyUpdate(uint32_t remoteTimestamp);
         uint32_t m_lastUpdateTimestamp;
 
         ccColor3B colorForUser(uint32_t userID);
@@ -67,11 +66,9 @@ class SyncManager{
         std::map<uint32_t, std::vector<CCSprite*>> m_remoteSelectionHighlights;
         std::map<uint32_t, std::map<std::string, float>> m_remoteSelections;
         CCPoint m_CursorPos;
-        CCArray* m_Selection;
 
         /* -- LEVEL SETTINGS -- */
         std::string extractSettingsString();
-        void applySettingsString(const char* str, uint32_t len);
         void applyLevelSettings(LevelSettingsPacket const& settings);
         bool isPopupBlockingLevelSettings();
         bool m_hasPendingLevelSettings = false;
@@ -80,6 +77,19 @@ class SyncManager{
         /* -- PLAYER SYNC -- */
         std::map<uint32_t, RemotePlayer> m_remotePlayers;
         float m_lastPlayerSendTime = 0.0f;
+
+        /* -- COLOR CHANNELS -- */
+        std::map<int, SavedColorData> m_lastColors;
+        std::map<int, SavedColorData> m_pendingColors;
+        bool m_colorsSeeded = false;
+
+        std::vector<GJEffectManager*> getColorManagers();
+        bool isSyncableColorChannel(int id);
+        bool readColor(GJEffectManager* manager, int id, SavedColorData& out);
+        void collectColors(std::vector<SavedColorData>& out);
+        void sendColors(const std::vector<SavedColorData>& colors, uint32_t targetPeerID);
+        void applyColors(const std::vector<SavedColorData>& colors);
+        void flushPendingColors();
 
     public:
         SyncManager();
@@ -128,9 +138,6 @@ class SyncManager{
         /* -- OTHERS -- */
         void handlePacket(const uint8_t* data, size_t size);
 
-        CCPoint getCursorPosition() const { return m_CursorPos; }
-        CCArray* getSelection() const { return m_Selection; }
-
         void setUserID(const uint32_t id) { m_userID = id; }
 
         bool isApplyingRemoteChanges() const { return m_applyingRemoteChanges; }
@@ -146,8 +153,8 @@ class SyncManager{
 
         void processPendingLevelSettings();
 
-        uint32_t getUserID() { return SyncManager::m_userID; }
-
         // color stuff
-        GJEffectManager* getActiveEffectManager();
+        void updateColorSync();
+        void sendAllColors(uint32_t targetPeerID);
+        void onRemoteColorsChanged(const ColorChannelsPacket& packet, size_t size);
 };
