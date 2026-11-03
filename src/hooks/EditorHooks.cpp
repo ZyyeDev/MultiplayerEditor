@@ -3,6 +3,7 @@
 #include <Geode/modify/EditorUI.hpp>
 #include <Geode/modify/GJBaseGameLayer.hpp>
 #include <Geode/modify/CCScheduler.hpp>
+#include <Geode/binding/StartPosObject.hpp>
 
 #include <map>
 #include <string>
@@ -106,7 +107,7 @@ class $modify(MyLevelEditorLayer, LevelEditorLayer){
 
             settings.settingsLength = 0;
             if (this->m_levelSettings) {
-                gd::string gs = this->m_levelSettings->getSaveString();
+                std::string gs = this->m_levelSettings->getSaveString();
                 std::string saveStr(gs);
                 settings.settingsLength = (uint32_t)std::min(saveStr.size(), sizeof(settings.settingsString) - 1);
                 strncpy(settings.settingsString, saveStr.c_str(), settings.settingsLength);
@@ -273,7 +274,7 @@ class $modify(MyEditorUI, EditorUI) {
             }
 
             if (tracked.find(obj) == tracked.end()) {
-                gd::string gs = obj->getSaveString(editor);
+                std::string gs = obj->getSaveString(editor);
                 tracked[obj] = std::string(gs);
                 toLock.push_back(g_sync->getObjectUid(obj));
             }
@@ -311,7 +312,7 @@ class $modify(MyEditorUI, EditorUI) {
             bool stillSelected = std::find(currentSelection.begin(), currentSelection.end(), obj) != currentSelection.end()
                 && std::find(toDeselect.begin(), toDeselect.end(), obj) == toDeselect.end();
 
-            gd::string gs = obj->getSaveString(editor);
+            std::string gs = obj->getSaveString(editor);
             std::string current = std::string(gs);
 
             if (!stillSelected) {

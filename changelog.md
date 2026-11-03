@@ -1,8 +1,9 @@
 # 0.2.0
+' ## Update to geode 6
 - ## COLORS SYNC!!!!!!!
 - now there's a loading screen while joining a room
 - removed tooltip from the button in the menu (it was bugging out and i dont really know why i added that lmao)
-- fixed some crashes and bugs
+- fix startpos not syncing up
 
 # 0.1.0
 - Bug Fixes

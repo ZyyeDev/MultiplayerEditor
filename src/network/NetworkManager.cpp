@@ -234,7 +234,7 @@ void NetworkManager::poll(){
             
             packet.header.timestamp = getCurrentTimestamp();
             packet.header.senderID = getPeerID();
-            gd::string username = getUsername();
+            std::string username = getUsername();
 
             strncpy(packet.username, username.c_str(), 63);
             packet.username[63] = '\0';
@@ -355,12 +355,12 @@ void NetworkManager::setOnDisconnect(std::function<void()> callback){
     m_onDisconnect = callback;
 }
 
-gd::string NetworkManager::getUsername(){
+std::string NetworkManager::getUsername(){
     m_username = GJAccountManager::get()->m_username;
     return m_username;
 }
 
-void NetworkManager::addPeer(uint32_t id, const gd::string& username){
+void NetworkManager::addPeer(uint32_t id, const std::string& username){
     m_peersInLobby[id] = username;
 }
 
@@ -371,7 +371,7 @@ void NetworkManager::removePeer(uint32_t id){
     }
 }
 
-void NetworkManager::broadcastPeerJoined(uint32_t peerID, const gd::string& username){
+void NetworkManager::broadcastPeerJoined(uint32_t peerID, const std::string& username){
     PeerJoinedPacket packet;
     packet.header.type = PacketType::PEER_JOINED;
     packet.header.timestamp = getCurrentTimestamp();

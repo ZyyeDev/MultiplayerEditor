@@ -48,7 +48,7 @@ void MouseTooltip::ensureLabel(){
     m_bg->setVisible(false);
     scene->addChild(m_bg, INT_MAX);
 
-    m_label = CCLabelBMFont::create("", "chatFont.fnt");
+    m_label = geode::Label::create("", "chatFont.fnt");
     m_label->setScale(0.6f);
     m_label->setAnchorPoint({0, 0});
     m_label->setPosition({4, 4});
@@ -59,7 +59,7 @@ void MouseTooltip::showTooltip(const std::string& text, ccColor3B color, CCPoint
     ensureLabel();
     if (!m_label || !m_bg) return;
 
-    m_label->setString(text.c_str());
+    m_label->setText(text);
     m_label->setColor(color);
 
     auto labelSize = m_label->getContentSize();

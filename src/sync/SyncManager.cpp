@@ -1,4 +1,7 @@
 #include <Geode/Geode.hpp>
+#include <Geode/ui/Label.hpp>
+#include <algorithm>
+#include <climits>
 #include <sstream>
 #include <cstring>
 #include <cstddef>
@@ -267,7 +270,7 @@ void SyncManager::onLocalObjectAdded(GameObject* obj) {
     m_localObjects.insert(obj);
     
     auto editor = getEditorLayer();
-    gd::string gdString = obj->getSaveString(editor);
+    std::string gdString = obj->getSaveString(editor);
     std::string objString = std::string(gdString);
     
     sendObjectPackets(PacketType::OBJECT_ADD, uid, objString);
@@ -304,7 +307,7 @@ void SyncManager::onLocalObjectModified(GameObject* obj) {
     std::string uid = getObjectUid(obj);
     
     auto editor = getEditorLayer();
-    gd::string gdString = obj->getSaveString(editor);
+    std::string gdString = obj->getSaveString(editor);
     std::string objString = std::string(gdString);
     
     sendObjectPackets(PacketType::OBJECT_UPDATE, uid, objString);
@@ -435,7 +438,7 @@ void SyncManager::sendFullState(uint32_t targetPeerID) {
             trackObject(uid, obj);
         }
 
-        gd::string gdString = obj->getSaveString(editor);
+        std::string gdString = obj->getSaveString(editor);
         std::string objString = std::string(gdString);
         std::string uid = getObjectUid(obj);
 
@@ -788,7 +791,7 @@ void SyncManager::onRemoteCursorUpdate(const uint32_t& userID, int x, int y){
         auto peers = g_network->m_peersInLobby;
         auto nameIt = peers.find(userID);
         if (nameIt != peers.end()) {
-            auto label = CCLabelBMFont::create(nameIt->second.c_str(), "chatFont.fnt");
+            auto label = geode::Label::create(nameIt->second, "chatFont.fnt");
             label->setScale(0.45f);
             label->setPosition(ccp(
                 cursor->getContentSize().width / 2.f,
@@ -965,7 +968,7 @@ void SyncManager::onRemoteSelectionChanged(const uint32_t& userID){
 std::string SyncManager::extractSettingsString() {
     auto editor = getEditorLayer();
     if (!editor || !editor->m_levelSettings) return "";
-    gd::string gs = editor->m_levelSettings->getSaveString();
+    std::string gs = editor->m_levelSettings->getSaveString();
     return std::string(gs);
 }
 

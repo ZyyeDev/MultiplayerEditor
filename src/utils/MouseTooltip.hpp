@@ -1,8 +1,11 @@
 #pragma once
 
 #include <Geode/Geode.hpp>
-#include <vector>
+#include <Geode/ui/Label.hpp>
 #include <string>
+#include <vector>
+#include <algorithm>
+#include <climits>
 
 using namespace geode::prelude;
 
@@ -24,7 +27,7 @@ class MouseTooltip {
 
     private:
         std::vector<TooltipRegion> m_regions;
-        CCLabelBMFont* m_label = nullptr;
+        geode::Label* m_label = nullptr;
         CCLayerColor* m_bg = nullptr;
 
         void ensureLabel();
