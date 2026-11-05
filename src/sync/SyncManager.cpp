@@ -16,6 +16,17 @@ extern NetworkManager* g_network;
 extern bool g_isHost;
 extern bool g_isPlaytesting;
 
+static void kickPeer(uint32_t peerID, const char* reason) {
+    KickPacket kick;
+    kick.header.type = PacketType::KICK_USER;
+    kick.header.timestamp = getCurrentTimestamp();
+    kick.header.senderID = g_network->getPeerID();
+    kick.userToKick = peerID;
+    strncpy(kick.kickReason, reason, 127);
+    kick.kickReason[127] = '\0';
+    g_network->sendPacketToPeer(peerID, &kick, sizeof(kick));
+}
+
 static PlayerGameMode getLocalPlayerGameMode(PlayerObject* plr) {
     if (plr->m_isShip) return PlayerGameMode::Ship;
     if (plr->m_isBall) return PlayerGameMode::Ball;
@@ -165,7 +176,7 @@ static void updateRemotePlayerVisual(
     }
 }
 
-SyncManager::SyncManager() : m_objectCounter(0), m_lastUpdateTimestamp(0) {
+SyncManager::SyncManager() : m_objectCounter(0) {
     m_userID = g_network->getPeerID();
 
     g_network->setOnRecive([this](const uint8_t* data, size_t size){
@@ -270,8 +281,7 @@ void SyncManager::onLocalObjectAdded(GameObject* obj) {
     m_localObjects.insert(obj);
     
     auto editor = getEditorLayer();
-    std::string gdString = obj->getSaveString(editor);
-    std::string objString = std::string(gdString);
+    std::string objString = obj->getSaveString(editor);
     
     sendObjectPackets(PacketType::OBJECT_ADD, uid, objString);
 }
@@ -307,8 +317,7 @@ void SyncManager::onLocalObjectModified(GameObject* obj) {
     std::string uid = getObjectUid(obj);
     
     auto editor = getEditorLayer();
-    std::string gdString = obj->getSaveString(editor);
-    std::string objString = std::string(gdString);
+    std::string objString = obj->getSaveString(editor);
     
     sendObjectPackets(PacketType::OBJECT_UPDATE, uid, objString);
 }
@@ -438,8 +447,7 @@ void SyncManager::sendFullState(uint32_t targetPeerID) {
             trackObject(uid, obj);
         }
 
-        std::string gdString = obj->getSaveString(editor);
-        std::string objString = std::string(gdString);
+        std::string objString = obj->getSaveString(editor);
         std::string uid = getObjectUid(obj);
 
         const size_t chunkSize = sizeof(ObjectStringPacket::objectString);
@@ -523,38 +531,13 @@ void SyncManager::handlePacket(const uint8_t* data, size_t size) {
                 // we MUST do this in another way
                 if (!g_network->checkPassword(safeStr(packet->password))){
                     log::info("user connecting password is incorrect");
-                    
-                    KickPacket _kickPacket;
-                    _kickPacket.header.type = PacketType::KICK_USER;
-                    _kickPacket.header.timestamp = getCurrentTimestamp();
-                    _kickPacket.header.senderID = g_network->getPeerID();
-                    _kickPacket.userToKick = packet->header.senderID;
-                    strncpy(_kickPacket.kickReason, "Wrong Password", 127);
-                    _kickPacket.kickReason[127] = '\0';
-                    g_network->sendPacketToPeer(
-                        packet->header.senderID,
-                        &_kickPacket,
-                        sizeof(_kickPacket)
-                    );
+                    kickPeer(packet->header.senderID, "Wrong Password");
                     break;
                 }
 
                 if (myVersion != theirVersion){
                     log::warn("version mismatch, kicking {}", packet->header.senderID);
-                    if (g_isHost){
-                        KickPacket _kickPacket;
-                        _kickPacket.header.type = PacketType::KICK_USER;
-                        _kickPacket.header.timestamp = getCurrentTimestamp();
-                        _kickPacket.header.senderID = g_network->getPeerID();
-                        _kickPacket.userToKick = packet->header.senderID;
-                        strncpy(_kickPacket.kickReason, "Version Mismatch", 127);
-                        _kickPacket.kickReason[127] = '\0';
-                        g_network->sendPacketToPeer(
-                            packet->header.senderID,
-                            &_kickPacket,
-                            sizeof(_kickPacket)
-                        );
-                    }
+                    kickPeer(packet->header.senderID, "Version Mismatch");
                     break;
                 }
 
@@ -569,21 +552,7 @@ void SyncManager::handlePacket(const uint8_t* data, size_t size) {
                 g_network->gotKicked(safeStr(packet->kickReason));
                 break;
             }
-            g_network->removePeer(packet->userToKick);
-            m_remoteSelections[packet->userToKick].clear();
-            onRemoteSelectionChanged(packet->userToKick);
-            m_remoteSelections.erase(packet->userToKick);
-            m_remoteSelectionHighlights.erase(packet->userToKick);
-            {
-                auto cursorIt = m_remoteCursors.find(packet->userToKick);
-                if (cursorIt != m_remoteCursors.end()) {
-                    if (cursorIt->second && cursorIt->second->getParent()) {
-                        cursorIt->second->removeFromParent();
-                    }
-                    m_remoteCursors.erase(cursorIt);
-                }
-            }
-            log::info("peer left {}", packet->userToKick);
+            onPeerLeft(packet->userToKick);
             break;
         }
         case PacketType::PEER_JOINED: {
@@ -597,21 +566,7 @@ void SyncManager::handlePacket(const uint8_t* data, size_t size) {
         case PacketType::PEER_LEFT: {
             if (size < sizeof(PeerLeftPacket)) break;
             const PeerLeftPacket* packet = reinterpret_cast<const PeerLeftPacket*>(data);
-            g_network->removePeer(packet->peerID);
-            m_remoteSelections[packet->peerID].clear();
-            onRemoteSelectionChanged(packet->peerID);
-            m_remoteSelections.erase(packet->peerID);
-            m_remoteSelectionHighlights.erase(packet->peerID);
-            {
-                auto cursorIt = m_remoteCursors.find(packet->peerID);
-                if (cursorIt != m_remoteCursors.end()) {
-                    if (cursorIt->second && cursorIt->second->getParent()) {
-                        cursorIt->second->removeFromParent();
-                    }
-                    m_remoteCursors.erase(cursorIt);
-                }
-            }
-            log::info("peer left {}", packet->peerID);
+            onPeerLeft(packet->peerID);
             break;
         }
         case PacketType::LOBBY_SYNC: {
@@ -654,7 +609,6 @@ void SyncManager::handlePacket(const uint8_t* data, size_t size) {
 
             if (packet->chunkIndex == 0) m_incomingChunks[uid] = ChunkBuffer{};
             m_incomingChunks[uid].data.append(packet->objectString, packet->chunkLength);
-            m_incomingChunks[uid].lastChunkIndex = packet->chunkIndex;
 
             if (!packet->hasMore) {
                 std::string fullString = m_incomingChunks[uid].data;
@@ -677,7 +631,6 @@ void SyncManager::handlePacket(const uint8_t* data, size_t size) {
 
             if (packet->chunkIndex == 0) m_incomingChunks[uid] = ChunkBuffer{};
             m_incomingChunks[uid].data.append(packet->objectString, packet->chunkLength);
-            m_incomingChunks[uid].lastChunkIndex = packet->chunkIndex;
 
             if (!packet->hasMore) {
                 std::string fullString = m_incomingChunks[uid].data;
@@ -910,8 +863,6 @@ void SyncManager::onRemoteSelectionChanged(const uint32_t& userID){
     if (!m_remoteSelections.contains(userID)){
         return;
     }
-    
-    // remove old highlights
     if (m_remoteSelectionHighlights.contains(userID)) {
         auto& highlights = m_remoteSelectionHighlights[userID];
         for (auto sprite : highlights){
@@ -968,8 +919,7 @@ void SyncManager::onRemoteSelectionChanged(const uint32_t& userID){
 std::string SyncManager::extractSettingsString() {
     auto editor = getEditorLayer();
     if (!editor || !editor->m_levelSettings) return "";
-    std::string gs = editor->m_levelSettings->getSaveString();
-    return std::string(gs);
+    return editor->m_levelSettings->getSaveString();
 }
 
 bool SyncManager::isPopupBlockingLevelSettings() {
@@ -1382,24 +1332,14 @@ void SyncManager::onRemotePlayerPosition(const PlayerPositionPacket& packet, Lev
 
 void SyncManager::cleanUpPlayers() {
     for (auto& [userId, remotePlayer] : m_remotePlayers) {
-        if (remotePlayer.player) {
-            if (remotePlayer.player->getParent()){
-                remotePlayer.player->removeFromParent();
-            }
-        }
-        if (remotePlayer.player2) {
-            if (remotePlayer.player2->getParent()){
-                remotePlayer.player2->removeFromParent();
-            }
-        }
+        if (remotePlayer.player) remotePlayer.player->removeFromParent();
+        if (remotePlayer.player2) remotePlayer.player2->removeFromParent();
     }
     m_remotePlayers.clear();
     m_lastPlayerSendTime = 0.0f;
 
     for (auto& [userId, cursor] : m_remoteCursors) {
-        if (cursor && cursor->getParent()){
-            cursor->removeFromParent();
-        }
+        if (cursor) cursor->removeFromParent();
     }
     m_remoteCursors.clear();
 }
@@ -1417,9 +1357,7 @@ void SyncManager::clearAllRemoteState(){
     m_remoteSelections.clear();
 
     for (auto& [userId, cursor] : m_remoteCursors) {
-        if (cursor && cursor->getParent()){
-            cursor->removeFromParent();
-        }
+        if (cursor) cursor->removeFromParent();
     }
     m_remoteCursors.clear();
 
@@ -1435,17 +1373,26 @@ void SyncManager::clearAllRemoteState(){
     MouseTooltip::get()->clear();
 }
 
-void SyncManager::clearPeerState(uint32_t peerID) {
-    // remove cursor
-    auto cursorIt = m_remoteCursors.find(peerID);
-    if (cursorIt != m_remoteCursors.end()) {
-        if (cursorIt->second && cursorIt->second->getParent()) {
-            cursorIt->second->removeFromParent();
-        }
-        m_remoteCursors.erase(cursorIt);
-    }
+void SyncManager::removeRemoteCursor(uint32_t userID) {
+    auto it = m_remoteCursors.find(userID);
+    if (it == m_remoteCursors.end()) return;
 
-    // remove select highlights
+    if (it->second) it->second->removeFromParent();
+    m_remoteCursors.erase(it);
+}
+
+void SyncManager::onPeerLeft(uint32_t peerID) {
+    g_network->removePeer(peerID);
+    m_remoteSelections[peerID].clear();
+    onRemoteSelectionChanged(peerID);
+    m_remoteSelections.erase(peerID);
+    m_remoteSelectionHighlights.erase(peerID);
+    removeRemoteCursor(peerID);
+    log::info("peer left {}", peerID);
+}
+
+void SyncManager::clearPeerState(uint32_t peerID) {
+    removeRemoteCursor(peerID);
     auto highlightsIt = m_remoteSelectionHighlights.find(peerID);
     if (highlightsIt != m_remoteSelectionHighlights.end()) {
         for (auto sprite : highlightsIt->second) {
@@ -1456,23 +1403,15 @@ void SyncManager::clearPeerState(uint32_t peerID) {
         }
         m_remoteSelectionHighlights.erase(highlightsIt);
     }
-
-    // remove select data
     m_remoteSelections.erase(peerID);
-
-    // remove player
     auto playerIt = m_remotePlayers.find(peerID);
     if (playerIt != m_remotePlayers.end()) {
         if (playerIt->second.player) {
-            if (playerIt->second.player->getParent()) {
-                playerIt->second.player->removeFromParent();
-            }
+            playerIt->second.player->removeFromParent();
             playerIt->second.player->destroyObject();
         }
         if (playerIt->second.player2) {
-            if (playerIt->second.player2->getParent()) {
-                playerIt->second.player2->removeFromParent();
-            }
+            playerIt->second.player2->removeFromParent();
             playerIt->second.player2->destroyObject();
         }
         m_remotePlayers.erase(playerIt);
