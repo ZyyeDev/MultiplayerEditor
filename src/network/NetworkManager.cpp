@@ -71,13 +71,9 @@ bool NetworkManager::host(uint16_t port, const std::string& password){
     }
     m_port = port;
     m_isHost = true;
-
-    // add ourself (host)
     addPeer(1, getUsername());
 
     setPassword(password);
-
-    // set timeouts on all connected peers
     setPeerTimeouts();
 
     log::info("Hosting on port {}", port);
