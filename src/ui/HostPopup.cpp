@@ -24,7 +24,6 @@ bool HostPopup::init(){
 
     auto winSize = this->m_mainLayer->getContentSize();
 
-    // ip label
     m_ipLabel = geode::Label::create("(Start hosting to see your IP)","chatFont.fnt");
     m_ipLabel->setScale(.6f);
     m_ipLabel->setPosition(ccp(
@@ -33,7 +32,6 @@ bool HostPopup::init(){
     ));
     this->m_mainLayer->addChild(m_ipLabel);
 
-    // help label
     m_helpLabel = geode::Label::create("Same WiFi/network: others type the IP and PORT above.\nDifferent network: port-forward this port and share your public IP instead.\nUsing Hamachi/Playit/similar: share the address IT gives you, not this one.","goldFont.fnt");
     m_helpLabel->setScale(.4f);
     m_helpLabel->setPosition(ccp(
@@ -49,7 +47,6 @@ bool HostPopup::init(){
         m_helpLabel->setVisible(true);
     }
 
-    // port input
     auto portLabel = geode::Label::create("Port:","bigFont.fnt");
     portLabel->setScale(0.5f);
     portLabel->setPosition(ccp(
@@ -67,7 +64,6 @@ bool HostPopup::init(){
     ));
     this->m_mainLayer->addChild(m_portInput);
 
-    // password input
     auto passLabel = geode::Label::create("Password:","bigFont.fnt");
     passLabel->setScale(0.5f);
     passLabel->setPosition(ccp(
@@ -90,7 +86,6 @@ bool HostPopup::init(){
     }
     );
 
-    // host button
     hostBtn = CCMenuItemSpriteExtra::create(
         ButtonSprite::create("Host", "goldFont.fnt", "GJ_button_01.png", .8f),
         this,
@@ -104,7 +99,6 @@ bool HostPopup::init(){
         hostBtn->setSprite(ButtonSprite::create("Stop Hosting", "goldFont.fnt", "GJ_button_01.png", .8f));
     }
 
-    // popup menu
     auto menu = CCMenu::create();
     menu->addChild(hostBtn);
     menu->setPosition(0, 0);

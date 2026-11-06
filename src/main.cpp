@@ -1,7 +1,5 @@
 #include <Geode/Geode.hpp>
 #include <Geode/loader/Log.hpp>
-#include <Geode/modify/EditorUI.hpp>
-#include <Geode/modify/MenuLayer.hpp>
 #include <Geode/modify/CCScheduler.hpp>
 
 #include <chrono>
@@ -12,11 +10,9 @@
 
 using namespace geode::prelude;
 
-// global instances
 NetworkManager* g_network = nullptr;
 SyncManager* g_sync = nullptr;
 
-// session states
 bool g_isHost = false;
 bool g_isInSession = false;
 bool g_isPlaytesting = false;
@@ -57,7 +53,6 @@ $on_mod(Loaded){
 	log::info("Collab editor loaded!");
 }
 
-// Poll in every frame
 class $modify(CCScheduler) {
     void update(float dt) {
         CCScheduler::update(dt);
