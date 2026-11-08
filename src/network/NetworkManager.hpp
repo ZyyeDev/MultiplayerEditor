@@ -6,7 +6,9 @@
 
 #include <string>
 #include <functional>
+
 #include "../../libs/enet/include/enet.h"
+#include "../../libs/PasswordHash.h"
 
 class NetworkManager{
     public:
@@ -55,9 +57,15 @@ class NetworkManager{
 
         void gotKicked(std::string reason);
 
-        bool checkPassword(std::string password) { return m_password == password; }
-        void setPassword(std::string password) { if (isHost()) m_password = password; }
-        std::string getPassword() { return m_password; }
+        bool checkPassword(const std::string& password) const;
+        void setPassword(const std::string& password) {
+            if (isHost()){
+                m_passwordHash = PasswordHash::hash(password);
+                m_passwordPlain = password; 
+            }
+        }
+        const std::string& getPassword() const {return m_passwordPlain; }
+        const std::string& getPasswordHash() const { return m_passwordHash; }
 
         bool requestFullSync = false;
 
@@ -67,7 +75,9 @@ class NetworkManager{
         ENetHost* m_host;
         ENetPeer* m_peer;
 
-        std::string m_password = ""; // we need to hashy hashy this, but me is lazy rn. I dont see any real vulnerability for not hashing this rn, maybe im stupid.
+        std::string m_passwordHash = "";
+        std::string m_passwordPlain = "";
+        std::string m_pendingPassword = "";
         
         bool m_isHost;
         std::string m_username;

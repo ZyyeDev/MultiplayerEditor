@@ -115,7 +115,7 @@ bool NetworkManager::connect(const std::string& ip, uint16_t port, const std::st
 
         m_port = port;
         m_isHost = false;
-        m_password = password;
+        m_pendingPassword = password;
         m_connectId = event.peer->connectID;
         m_peer = event.peer;
 
@@ -239,7 +239,7 @@ void NetworkManager::poll(){
             strncpy(packet.version, version.c_str(), 31);
             packet.version[31] = '\0';
 
-            strncpy(packet.password, m_password.c_str(), 63);
+            strncpy(packet.password, m_pendingPassword.c_str(), 63);
             packet.password[63] = '\0';
             
             sendPacket(&packet, sizeof(packet));
@@ -435,4 +435,8 @@ void NetworkManager::setPeerTimeouts() {
     } else if (m_peer) {
         enet_peer_timeout(m_peer, 64, 5000, 120000);
     }
+}
+
+bool NetworkManager::checkPassword(const std::string& password) const {
+    return PasswordHash::verify(password, m_passwordHash);
 }
