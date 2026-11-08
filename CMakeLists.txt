@@ -19,6 +19,7 @@ set(CMAKE_CXX_VISIBILITY_PRESET hidden)
 project(MultiplayerEditor VERSION 1.0.0)
 
 add_subdirectory(libs/enet)
+add_subdirectory(libs/crypto)
 
 file(GLOB_RECURSE SOURCES CONFIGURE_DEPENDS src/*.cpp)
 
@@ -32,6 +33,6 @@ endif()
 
 add_subdirectory($ENV{GEODE_SDK} ${CMAKE_CURRENT_BINARY_DIR}/geode)
 
-target_link_libraries(${PROJECT_NAME} enet)
+target_link_libraries(${PROJECT_NAME} enet crypto)
 
 setup_geode_mod(${PROJECT_NAME})
