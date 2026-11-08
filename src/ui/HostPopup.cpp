@@ -24,8 +24,7 @@ bool HostPopup::init(){
 
     auto winSize = this->m_mainLayer->getContentSize();
 
-    // ip label
-    m_ipLabel = CCLabelBMFont::create("(Start hosting to see your IP)","chatFont.fnt");
+    m_ipLabel = geode::Label::create("(Start hosting to see your IP)","chatFont.fnt");
     m_ipLabel->setScale(.6f);
     m_ipLabel->setPosition(ccp(
         winSize.width/2,
@@ -33,8 +32,7 @@ bool HostPopup::init(){
     ));
     this->m_mainLayer->addChild(m_ipLabel);
 
-    // help label
-    m_helpLabel = CCLabelBMFont::create("Same WiFi/network: others type the IP and PORT above.\nDifferent network: port-forward this port and share your public IP instead.\nUsing Hamachi/Playit/similar: share the address IT gives you, not this one.","goldFont.fnt");
+    m_helpLabel = geode::Label::create("Same WiFi/network: others type the IP and PORT above.\nDifferent network: port-forward this port and share your public IP instead.\nUsing Hamachi/Playit/similar: share the address IT gives you, not this one.","goldFont.fnt");
     m_helpLabel->setScale(.4f);
     m_helpLabel->setPosition(ccp(
         winSize.width/2,
@@ -45,12 +43,11 @@ bool HostPopup::init(){
     
     if (g_isHost && g_isInSession){
         std::string ipStr = NetworkManager::getLocalIP() + ":" + std::to_string(g_network->m_port);
-        m_ipLabel->setString(ipStr.c_str());
+        m_ipLabel->setText(ipStr);
         m_helpLabel->setVisible(true);
     }
 
-    // port input
-    auto portLabel = CCLabelBMFont::create("Port:","bigFont.fnt");
+    auto portLabel = geode::Label::create("Port:","bigFont.fnt");
     portLabel->setScale(0.5f);
     portLabel->setPosition(ccp(
         winSize.width/2,
@@ -67,8 +64,7 @@ bool HostPopup::init(){
     ));
     this->m_mainLayer->addChild(m_portInput);
 
-    // password input
-    auto passLabel = CCLabelBMFont::create("Password:","bigFont.fnt");
+    auto passLabel = geode::Label::create("Password:","bigFont.fnt");
     passLabel->setScale(0.5f);
     passLabel->setPosition(ccp(
         winSize.width/2,
@@ -90,7 +86,6 @@ bool HostPopup::init(){
     }
     );
 
-    // host button
     hostBtn = CCMenuItemSpriteExtra::create(
         ButtonSprite::create("Host", "goldFont.fnt", "GJ_button_01.png", .8f),
         this,
@@ -104,7 +99,6 @@ bool HostPopup::init(){
         hostBtn->setSprite(ButtonSprite::create("Stop Hosting", "goldFont.fnt", "GJ_button_01.png", .8f));
     }
 
-    // popup menu
     auto menu = CCMenu::create();
     menu->addChild(hostBtn);
     menu->setPosition(0, 0);
@@ -158,7 +152,7 @@ void HostPopup::onStartHost(CCObject*){
         g_sync->setUserID(g_network->getPeerID());
 
         std::string ipStr = NetworkManager::getLocalIP() + ":" + std::to_string(port);
-        m_ipLabel->setString(ipStr.c_str());
+        m_ipLabel->setText(ipStr);
         m_helpLabel->setVisible(true);
 
         g_sync->trackExistingObjects();

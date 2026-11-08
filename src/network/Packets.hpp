@@ -1,9 +1,7 @@
 #pragma once
 
-#include <iostream>
 #include <cstdint>
 #include <cstring>
-#include <array>
 #include <ctime>
 #include <Geode/Geode.hpp>
 

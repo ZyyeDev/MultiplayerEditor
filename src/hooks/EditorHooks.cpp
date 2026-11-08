@@ -3,6 +3,7 @@
 #include <Geode/modify/EditorUI.hpp>
 #include <Geode/modify/GJBaseGameLayer.hpp>
 #include <Geode/modify/CCScheduler.hpp>
+#include <Geode/binding/StartPosObject.hpp>
 
 #include <map>
 #include <string>
@@ -52,16 +53,12 @@ void try_add_object(auto obj){
                 log::debug("try_add_object: sending object {}", fmt::ptr((void*)obj));
                 g_sync->onLocalObjectAdded(obj);
             }
-        } else {
-            //log::warn("try_add_object: editorUI is null, object {} was NOT sent!", fmt::ptr((void*)obj));
         }
     }
 }
 
 class $modify(MyLevelEditorLayer, LevelEditorLayer){
     struct Fields {
-        bool m_playtesting = false;
-
         ~Fields(){
             if (g_isInSession && g_network){
                 g_network->disconnect();
@@ -106,8 +103,7 @@ class $modify(MyLevelEditorLayer, LevelEditorLayer){
 
             settings.settingsLength = 0;
             if (this->m_levelSettings) {
-                gd::string gs = this->m_levelSettings->getSaveString();
-                std::string saveStr(gs);
+                std::string saveStr = this->m_levelSettings->getSaveString();
                 settings.settingsLength = (uint32_t)std::min(saveStr.size(), sizeof(settings.settingsString) - 1);
                 strncpy(settings.settingsString, saveStr.c_str(), settings.settingsLength);
                 settings.settingsString[settings.settingsLength] = '\0';
@@ -144,7 +140,6 @@ class $modify(MyLevelEditorLayer, LevelEditorLayer){
 
     void onPlaytest() {
         log::info("start playtest");
-        m_fields->m_playtesting = true;
         g_isPlaytesting = true;
         if (g_sync) {
             g_sync->cleanUpPlayers();
@@ -156,7 +151,6 @@ class $modify(MyLevelEditorLayer, LevelEditorLayer){
     void onStopPlaytest() {
         log::info("stop playtest");
 
-        m_fields->m_playtesting = false;
         g_isPlaytesting = false;
         if (g_sync) {
             g_sync->cleanUpPlayers();
@@ -212,7 +206,6 @@ class $modify(MyGJBaseGameLayer, GJBaseGameLayer) {
 class $modify(MyEditorUI, EditorUI) {
     struct Fields {
         std::map<GameObject*, std::string> m_trackedSelections;
-        float m_diffTimer = 0.f;
         float m_lockRefreshTimer = 0.f;
     };
 
@@ -273,8 +266,7 @@ class $modify(MyEditorUI, EditorUI) {
             }
 
             if (tracked.find(obj) == tracked.end()) {
-                gd::string gs = obj->getSaveString(editor);
-                tracked[obj] = std::string(gs);
+                tracked[obj] = obj->getSaveString(editor);
                 toLock.push_back(g_sync->getObjectUid(obj));
             }
         }
@@ -311,8 +303,7 @@ class $modify(MyEditorUI, EditorUI) {
             bool stillSelected = std::find(currentSelection.begin(), currentSelection.end(), obj) != currentSelection.end()
                 && std::find(toDeselect.begin(), toDeselect.end(), obj) == toDeselect.end();
 
-            gd::string gs = obj->getSaveString(editor);
-            std::string current = std::string(gs);
+            std::string current = obj->getSaveString(editor);
 
             if (!stillSelected) {
                 if (current != it->second) {

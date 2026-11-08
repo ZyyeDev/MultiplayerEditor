@@ -17,7 +17,6 @@ class $modify(CollabMenuLayer, MenuLayer){
         auto bottomMenu = this->getChildByID("bottom-menu");
         if (!bottomMenu) return false;
 
-        /* ---- CREATE BUTTON ---- */
         auto joinSprite = CCSprite::create("multiplayerCollabButton.png"_spr);
         
         auto joinBtn = CCMenuItemSpriteExtra::create(
@@ -33,8 +32,6 @@ class $modify(CollabMenuLayer, MenuLayer){
         m_fields->m_joinBtn = joinBtn;
 
         //MouseTooltip::get()->registerRegion(joinBtn, "Join A Lobby By IP", {80, 100, 255});
-
-        /* --------------------- */
 
         return true;
     }

@@ -71,13 +71,9 @@ bool NetworkManager::host(uint16_t port, const std::string& password){
     }
     m_port = port;
     m_isHost = true;
-
-    // add ourself (host)
     addPeer(1, getUsername());
 
     setPassword(password);
-
-    // set timeouts on all connected peers
     setPeerTimeouts();
 
     log::info("Hosting on port {}", port);
@@ -119,7 +115,7 @@ bool NetworkManager::connect(const std::string& ip, uint16_t port, const std::st
 
         m_port = port;
         m_isHost = false;
-        m_password = password;
+        m_pendingPassword = password;
         m_connectId = event.peer->connectID;
         m_peer = event.peer;
 
@@ -234,7 +230,7 @@ void NetworkManager::poll(){
             
             packet.header.timestamp = getCurrentTimestamp();
             packet.header.senderID = getPeerID();
-            gd::string username = getUsername();
+            std::string username = getUsername();
 
             strncpy(packet.username, username.c_str(), 63);
             packet.username[63] = '\0';
@@ -243,7 +239,7 @@ void NetworkManager::poll(){
             strncpy(packet.version, version.c_str(), 31);
             packet.version[31] = '\0';
 
-            strncpy(packet.password, m_password.c_str(), 63);
+            strncpy(packet.password, m_pendingPassword.c_str(), 63);
             packet.password[63] = '\0';
             
             sendPacket(&packet, sizeof(packet));
@@ -355,12 +351,12 @@ void NetworkManager::setOnDisconnect(std::function<void()> callback){
     m_onDisconnect = callback;
 }
 
-gd::string NetworkManager::getUsername(){
+std::string NetworkManager::getUsername(){
     m_username = GJAccountManager::get()->m_username;
     return m_username;
 }
 
-void NetworkManager::addPeer(uint32_t id, const gd::string& username){
+void NetworkManager::addPeer(uint32_t id, const std::string& username){
     m_peersInLobby[id] = username;
 }
 
@@ -371,7 +367,7 @@ void NetworkManager::removePeer(uint32_t id){
     }
 }
 
-void NetworkManager::broadcastPeerJoined(uint32_t peerID, const gd::string& username){
+void NetworkManager::broadcastPeerJoined(uint32_t peerID, const std::string& username){
     PeerJoinedPacket packet;
     packet.header.type = PacketType::PEER_JOINED;
     packet.header.timestamp = getCurrentTimestamp();
@@ -439,4 +435,8 @@ void NetworkManager::setPeerTimeouts() {
     } else if (m_peer) {
         enet_peer_timeout(m_peer, 64, 5000, 120000);
     }
+}
+
+bool NetworkManager::checkPassword(const std::string& password) const {
+    return PasswordHash::verify(password, m_passwordHash);
 }

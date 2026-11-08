@@ -15,7 +15,4 @@ This mod uses **P2P**, we recommend to use [Hamachi](https://vpn.net/) or simila
 
 ## Contributing
 
-Contributions are welcome! Feel free to:
-- Report bugs in the [Issues](../../issues) section
-- Submit pull requests
-- Suggest features
+Bug reports, feature ideas and pull requests go in the [Issues](../../issues) section.

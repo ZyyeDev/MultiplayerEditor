@@ -15,9 +15,7 @@ class $modify(CollabEditorPauseLayer, EditorPauseLayer){
         if (!EditorPauseLayer::init(lel)) return false;
 
         // we dont want to show the button to clients
-        if (g_isInSession && !g_isHost){
-            return true;
-        }
+        if (g_isInSession && !g_isHost) return true;
 
         auto menu = this->getChildByType<CCMenu>(0);
         if (!menu){
@@ -25,55 +23,19 @@ class $modify(CollabEditorPauseLayer, EditorPauseLayer){
             return true;
         }
 
-        if (g_isInSession && !g_isHost){
-            auto saveBtn = typeinfo_cast<CCMenuItemSpriteExtra*>(menu->getChildByID("save-button"));
-            //if (saveBtn){
-            //    saveBtn->setEnabled(false);
-            //    saveBtn->setOpacity(100);
-            //}
-
-            auto saveAndExitBtn = typeinfo_cast<CCMenuItemSpriteExtra*>(menu->getChildByID("save-and-exit-button"));
-            if (saveAndExitBtn) {
-                saveAndExitBtn->setEnabled(false);
-                saveAndExitBtn->setVisible(false);
-            }
-        }
-
-        if (!g_isInSession){
-            auto hostSprite = ButtonSprite::create(
-                "Host Session",
+        auto hostBtn = CCMenuItemSpriteExtra::create(
+            ButtonSprite::create(
+                g_isInSession ? "Stop Hosting" : "Host Session",
                 "goldFont.fnt",
                 "GJ_button_01.png",
                 1.0f
-            );
-            //hostSprite->setScale(.7f);
+            ),
+            this,
+            menu_selector(CollabEditorPauseLayer::onHostSession)
+        );
 
-            auto hostBtn = CCMenuItemSpriteExtra::create(
-                hostSprite,
-                this,
-                menu_selector(CollabEditorPauseLayer::onHostSession)
-            );
-
-            menu->addChild(hostBtn);
-            menu->updateLayout();
-        }else if (g_isHost){
-            auto hostSprite = ButtonSprite::create(
-                "Stop Hosting",
-                "goldFont.fnt",
-                "GJ_button_01.png",
-                1.0f
-            );
-            //hostSprite->setScale(.7f);
-
-            auto hostBtn = CCMenuItemSpriteExtra::create(
-                hostSprite,
-                this,
-                menu_selector(CollabEditorPauseLayer::onHostSession)
-            );
-
-            menu->addChild(hostBtn);
-            menu->updateLayout();
-        }
+        menu->addChild(hostBtn);
+        menu->updateLayout();
 
         return true;
     }
@@ -111,7 +73,7 @@ class $modify(CollabEditorPauseLayer, EditorPauseLayer){
 
         g_isInSession = false;
         g_isHost = false;
-        
+
         EditorPauseLayer::onExitEditor(sender);
     }
 
@@ -120,7 +82,7 @@ class $modify(CollabEditorPauseLayer, EditorPauseLayer){
         //    FLAlertLayer::create("Already in session", "You're already hosting or in a session!", "OK")->show();
         //    return;
         //}
-        
+
         HostPopup::create()->show();
     }
 };

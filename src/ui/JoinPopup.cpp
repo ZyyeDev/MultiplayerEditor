@@ -1,4 +1,7 @@
 #include <Geode/Geode.hpp>
+#include <Geode/ui/Label.hpp>
+
+#include <thread>
 
 #include "../sync/SyncManager.hpp"
 #include "JoinPopup.hpp"
@@ -26,8 +29,7 @@ bool JoinPopup::init(){
 
     auto winSize = this->m_mainLayer->getContentSize();
 
-    // Address input (host:port)
-    auto addrLabel = CCLabelBMFont::create("Address (host:port):","bigFont.fnt");
+    auto addrLabel = geode::Label::create("Address (host:port):","bigFont.fnt");
     addrLabel->setScale(0.5f);
     addrLabel->setPosition(ccp(
         winSize.width/2,
@@ -44,8 +46,7 @@ bool JoinPopup::init(){
     ));
     this->m_mainLayer->addChild(m_addressInput);
 
-    // Password Input
-    auto passLabel = CCLabelBMFont::create("Password:","bigFont.fnt");
+    auto passLabel = geode::Label::create("Password:","bigFont.fnt");
     passLabel->setScale(0.5f);
     passLabel->setPosition(ccp(
         winSize.width/2,
@@ -62,7 +63,6 @@ bool JoinPopup::init(){
     ));
     this->m_mainLayer->addChild(m_passInput);
 
-    // Join button
     auto joinBtn = CCMenuItemSpriteExtra::create(
         ButtonSprite::create("Join","goldFont.fnt","GJ_button_01.png",0.8f),
         this,
@@ -93,7 +93,6 @@ void JoinPopup::OnJoin(CCObject*) {
     std::string ip;
     uint16_t port = g_network->m_port;
 
-    // Parse host:port
     auto colonPos = address.find(':');
     if (colonPos != std::string::npos){
         ip = address.substr(0, colonPos);
