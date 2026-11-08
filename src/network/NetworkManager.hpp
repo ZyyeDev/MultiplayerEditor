@@ -8,7 +8,7 @@
 #include <functional>
 
 #include "../../libs/enet/include/enet.h"
-#include "../../libs/PasswordHash.h"
+#include "PasswordHash.h"
 
 class NetworkManager{
     public:
