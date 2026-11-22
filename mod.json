@@ -1,5 +1,5 @@
 {
-	"geode": "6.0.0-alpha.1",
+	"geode": "6.0.0-beta.1",
 	"gd": {
 		"win": "2.2091",
 		"android": "2.2091",
@@ -8,7 +8,7 @@
 	},
 	"id": "zyyedev.multiplayereditor",
 	"name": "Multiplayer Editor",
-	"version": "v0.2.0",
+	"version": "v0.2.1",
 	"developer": "ZyyeDev",
 	"description": "Multiplayer Collab Editor",
     "resources": {	
